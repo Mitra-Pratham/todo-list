@@ -1,0 +1,11 @@
+html,body{
+    font-family: "Roboto", serif;
+}
+
+
+.alert{
+    display: none;
+    position: fixed;
+    right: 16px;
+    z-index: 99;
+}
