@@ -216,9 +216,28 @@ function createUpdateDateList(data, messageType, messageText) {
     setMessageState(messageType, messageText);
 }
 
+function bubbleSort(arr) {
+	let n = arr.length;
+
+	// Traverse through all array elements
+	for (let i = 0; i < n - 1; i++) {
+		for (let j = 0; j < n - 1 - i; j++) {
+			// Swap if element is greater than next index
+            let prevDate = new Date(arr[j].id).getTime();
+            let newDate = new Date(arr[j+1].id).getTime();
+			if (prevDate > newDate) {
+            	[arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+			}
+		}
+	}
+    
+	return arr;
+}
+
 //function to render the date list HTML
 function renderDateList(data) {
-    taskArray = data;
+    taskArray = bubbleSort(data).reverse();
+    
     $('#date-list-container').empty();
     let tempHtml = data.map(function (el) {
         return `
