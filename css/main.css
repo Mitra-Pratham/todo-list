@@ -1,6 +1,56 @@
+:root{
+    --button-radius: 120px;
+}
+
 html,body{
     font-family: "Roboto", serif;
 }
+
+.btn{
+    position: relative;
+}
+
+.btn-lite-sm{
+    font-size: .675rem;
+    padding: .3rem .75rem;
+}
+
+.btn-no-bg{
+    color: rgb(var(--bs-primary-rgb));
+    background: transparent;
+    transition: all ease .3s;
+    border-radius: var(--button-radius);
+}
+
+.btn-lite-bg{
+    color: rgb(var(--bs-primary-rgb));
+    background: rgba(var(--bs-primary-rgb),0.1);
+    transition: all ease .3s;
+    border-radius: var(--button-radius);
+}
+
+.btn-lite-bg:hover, .btn-no-bg:hover{
+    color: rgb(var(--bs-primary-rgb));
+    background: rgba(var(--bs-primary-rgb),0.3);
+}
+
+.btn-title{
+    display: none;
+   position: absolute;
+   top: -32px;
+   left: 6px;
+   background: rgba(0, 0, 0, 0.9);
+   font-size: .8rem;
+   color: white;
+   padding: 6px;
+   border-radius: 4px;
+   width: max-content;
+   z-index: 10000;
+  }
+  
+  .btn:hover > .btn-title {
+    display: block;
+  }
 
 
 .alert{
@@ -8,4 +58,36 @@ html,body{
     position: fixed;
     right: 16px;
     z-index: 99;
+}
+
+#update-task-name{
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--bs-blue);
+}
+
+#update-task-name:focus{
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 2px solid var(--bs-blue);
+    outline: none;
+}
+
+.list-group-item:hover, input:hover{
+    border: 1px solid rgba(var(--bs-primary-rgb),0.5);
+}
+
+.date-item{
+    background-color: var(--bs-gray-100);
+    border-radius: 8px;
+    .fa-circle{
+        color: var(--bs-gray-400);
+    }
+}
+
+.completed-task{
+    text-decoration: line-through;
+    /* background-color: rgba(25, 135, 84, .1); */
 }
