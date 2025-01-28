@@ -167,7 +167,7 @@ $('#date-list-container').on('keydown', '#update-task-name', function (e) {
         let tempTaskName = $(this).val().trim();
         let dateID = $(this).attr('dateid');
         let taskID = $(this).attr('taskid');
-        updateTasks(dateID, taskID, tempTaskName);
+        updateTasks(dateID, taskID, tempTaskName, '','');
         $(this).remove();
     }
     else if(e.keyCode == 27){
@@ -185,7 +185,7 @@ $('#date-list-container').on('click', '.todo-task-check', function () {
     let taskID = $(this).val().slice(16);
     let statusCode = $(this).attr('statuscode');
     let newStatusCode = statusCode == 1001 ? 1004 : 1001;
-    updateTasks(dateID, taskID, '',newStatusCode);
+    updateTasks(dateID, taskID, '',newStatusCode, '');
     
 });
 
