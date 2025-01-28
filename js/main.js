@@ -80,6 +80,7 @@ function loadTasksFromDB() {
 
             taskArray = [...getAllRequest.result];
             renderDateList(taskArray);
+            renderDateNav(taskArray);
         };
 
         getAllRequest.onerror = function () {
@@ -105,6 +106,7 @@ $('#todo-date-submit').on('click', function () {
     }
     if (taskArray.some(e => e.id == inputDate) === false) {
         taskArray.push(tempItem);
+        
         createUpdateDateList(taskArray, 'success', 'Date list successfully created!');
     }
     else {
@@ -212,6 +214,7 @@ function setMessageState(type, message) {
 //create and update date and task lists
 function createUpdateDateList(data, messageType, messageText) {
     renderDateList(data);
+    renderDateNav(data);
     saveTasksToDB(data);
     setMessageState(messageType, messageText);
 }
@@ -236,7 +239,9 @@ function bubbleSort(arr) {
 
 //function to render the date list HTML
 function renderDateList(data) {
-    taskArray = bubbleSort(data).reverse();
+    
+   taskArray = bubbleSort(data).reverse();
+   
     
     $('#date-list-container').empty();
     let tempHtml = data.map(function (el) {
@@ -264,6 +269,24 @@ function renderDateList(data) {
         `
     });
     $(`#date-list-container`).append(tempHtml);
+}
+
+//render the date list navigation
+function renderDateNav(data){
+    
+    $('#date-list-nav-container').empty();
+    let tempHtml = data.map(function (el) {
+        return `
+         <div class="p-1">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <a class="btn btn-lite-sm btn-no-bg" href="#date-item-${el.id}">${el.name}</a>
+                    </div>
+                </div>
+            </div>
+        `
+    });
+    $(`#date-list-nav-container`).append(tempHtml);
 }
 
 //label & add task button
@@ -347,6 +370,7 @@ function deleteDateList(dateID) {
     let newData = taskArray.filter(el => el.id != dateID);
     createUpdateDateList(newData, 'success', 'Date list deleted successfully!');
 }
+
 //Function to create tasks
 function createTask(taskName, dateID, el) {
 
