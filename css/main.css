@@ -153,3 +153,13 @@ input:hover {
     font-size: .75rem;
     color: var(--bs-gray-600);
 }
+
+.drag-group{
+    display: none;
+    .drag-group-item{
+        font-size: .8rem;
+        color:rgba(var(--bs-primary-rgb),0.7) ;
+        background-color: rgba(var(--bs-primary-rgb),0.1);
+        border: 2px dashed rgba(var(--bs-primary-rgb),0.4);
+    }
+}

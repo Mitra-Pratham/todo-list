@@ -246,7 +246,7 @@ function renderDateList(data) {
     $('#date-list-container').empty();
     let tempHtml = data.map(function (el) {
         return `
-         <div id="date-item-${el.id}" class="mb-4 p-3 date-item" ondrop="drop(event)" ondragover="allowDrop(event)" value="${el.id}">
+         <div id="date-item-${el.id}" class="mb-4 p-3 date-item">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div class="d-flex align-items-start">
                         <div class="d-grid">
@@ -267,6 +267,11 @@ function renderDateList(data) {
                 
                 <ul class="list-group">
                 ${el.taskList.map((el) => renderTaskList(el)).join("")}
+                </ul>
+                <ul class="list-group drag-group mt-2">
+                    <li class="list-group-item drag-group-item" ondrop="drop(event)" ondragover="allowDrop(event)" value="${el.id}">
+                        Drop task here
+                    </li>
                 </ul>
             </div>
         `
