@@ -15,27 +15,27 @@ body {
 
 .btn-lite-sm {
     font-size: .675rem;
-    padding: .3rem .75rem;
 }
 
 .btn-no-bg {
     color: rgb(var(--bs-primary-rgb));
     background: transparent;
-    transition: all ease .3s;
+    transition: all ease .2s;
     border-radius: var(--button-radius);
 }
 
 .btn-no-bg-gray{
     color: var(--bs-gray-500);
     background: transparent;
-    transition: all ease .3s;
+    transition: all ease .2s;
     border-radius: var(--button-radius);
+    padding: .2rem .3rem;
 }
 
 .btn-lite-bg {
     color: rgb(var(--bs-primary-rgb));
     background: rgba(var(--bs-primary-rgb), 0.1);
-    transition: all ease .3s;
+    transition: all ease .2s;
     border-radius: var(--button-radius);
 }
 
@@ -44,6 +44,10 @@ body {
 .btn-no-bg-gray:hover {
     color: rgb(var(--bs-primary-rgb));
     background: rgba(var(--bs-primary-rgb), 0.3);
+}
+
+.btn-no-bg-gray:hover{
+    padding: .4rem .6rem;
 }
 
 .btn-title {

@@ -310,7 +310,7 @@ function renderTaskListCount(taskList) {
 
 //label & add task button
 // <label for="todo-input-${el.id}">Create task</label>
-{/* <button type="button" class="btn btn-sm btn-lite-bg ms-3 todo-task-submit" style="border: none;">
+{/* <button type="button" class="btn btn-sm btn-no-bg-gray ms-3 todo-task-submit" style="border: none;">
                             <i class="fa-solid fa-plus"></i>
                         </button> */}
 
@@ -327,13 +327,13 @@ function renderTaskList(el) {
     </div>
         <div class="d-flex">
         
-            <button type="button" class="btn btn-lite-sm btn-lite-bg ms-2 todo-task-edit" value="${el.id}">
+            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${el.id}">
                 <i class="fa-solid fa-pencil"></i>
-                <span class="btn-title">Edit Task</span>
+                <span class="btn-title">Edit</span>
             </button>
-            <button type="button" class="btn btn-lite-sm btn-lite-bg ms-2 todo-task-delete" value="${el.id}">
+            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${el.id}">
                 <i class="fa-solid fa-trash"></i>
-                <span class="btn-title">Delete Task</span>
+                <span class="btn-title">Delete</span>
             </button>
         </div>
     </li>
