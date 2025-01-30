@@ -102,11 +102,11 @@ $('#todo-date-submit').on('click', function () {
         id: inputDate,
         name: inputDateName,
         taskList: [],
-        statusCode:1001
+        statusCode: 1001
     }
     if (taskArray.some(e => e.id == inputDate) === false) {
         taskArray.push(tempItem);
-        
+
         createUpdateDateList(taskArray, 'success', 'Date list successfully created!');
     }
     else {
@@ -167,10 +167,10 @@ $('#date-list-container').on('keydown', '#update-task-name', function (e) {
         let tempTaskName = $(this).val().trim();
         let dateID = $(this).attr('dateid');
         let taskID = $(this).attr('taskid');
-        updateTasks(dateID, taskID, tempTaskName, '','');
+        updateTasks(dateID, taskID, tempTaskName, '', '');
         $(this).remove();
     }
-    else if(e.keyCode == 27){
+    else if (e.keyCode == 27) {
         let prevValue = $(this).attr('prevvalue');
         $(this).parent().text(prevValue);
         $(this).remove();
@@ -180,13 +180,13 @@ $('#date-list-container').on('keydown', '#update-task-name', function (e) {
 
 //event listener to create the input field for editing the tasks
 $('#date-list-container').on('click', '.todo-task-check', function () {
-    
+
     let dateID = $(this).val().slice(5, 15);
     let taskID = $(this).val().slice(16);
     let statusCode = $(this).attr('statuscode');
     let newStatusCode = statusCode == 1001 ? 1004 : 1001;
-    updateTasks(dateID, taskID, '',newStatusCode, '');
-    
+    updateTasks(dateID, taskID, '', newStatusCode, '');
+
 });
 
 // //event listener to change the status field for tasks
@@ -220,36 +220,39 @@ function createUpdateDateList(data, messageType, messageText) {
 }
 
 function bubbleSort(arr) {
-	let n = arr.length;
+    let n = arr.length;
 
-	// Traverse through all array elements
-	for (let i = 0; i < n - 1; i++) {
-		for (let j = 0; j < n - 1 - i; j++) {
-			// Swap if element is greater than next index
+    // Traverse through all array elements
+    for (let i = 0; i < n - 1; i++) {
+        for (let j = 0; j < n - 1 - i; j++) {
+            // Swap if element is greater than next index
             let prevDate = new Date(arr[j].id).getTime();
-            let newDate = new Date(arr[j+1].id).getTime();
-			if (prevDate > newDate) {
-            	[arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
-			}
-		}
-	}
-    
-	return arr;
+            let newDate = new Date(arr[j + 1].id).getTime();
+            if (prevDate > newDate) {
+                [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+            }
+        }
+    }
+
+    return arr;
 }
 
 //function to render the date list HTML
 function renderDateList(data) {
-    
-   taskArray = bubbleSort(data).reverse();
-   
-    
+
+    taskArray = bubbleSort(data).reverse();
+
+
     $('#date-list-container').empty();
     let tempHtml = data.map(function (el) {
         return `
          <div id="date-item-${el.id}" class="mb-4 p-3 date-item">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="d-flex align-items-center">
-                        <h4 class="mb-0">${el.name}</h4>
+                        <div class="d-flex align-items-center">
+                            <h4 class="mb-0">${el.name}</h4>
+                            <p class="fs-6 text-muted ms-2 mb-0">(${renderTaskListCount(el.taskList)}/${el.taskList.length})</p>
+                        </div>
                         <button type="button" class="btn btn-sm btn-lite-bg ms-2 todo-date-delete" value="${el.id}">
                             <i class="fa-solid fa-trash"></i>
                             <span class="btn-title">Delete Date List</span>
@@ -272,21 +275,31 @@ function renderDateList(data) {
 }
 
 //render the date list navigation
-function renderDateNav(data){
-    
+function renderDateNav(data) {
+
     $('#date-list-nav-container').empty();
     let tempHtml = data.map(function (el) {
         return `
          <div class="p-1">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <a class="btn btn-lite-sm btn-no-bg" href="#date-item-${el.id}">${el.name}</a>
+                        <a class="btn btn-lite-sm btn-no-bg" href="#date-item-${el.id}">${el.name} (${renderTaskListCount(el.taskList)}/${el.taskList.length})</a>
                     </div>
                 </div>
             </div>
         `
     });
     $(`#date-list-nav-container`).append(tempHtml);
+}
+
+function renderTaskListCount(taskList) {
+    let count = 0;
+    taskList.forEach(el => {
+        if (el.statusCode == 1004) {
+            count++;
+        }
+    });
+    return count;
 }
 
 //label & add task button
@@ -327,11 +340,11 @@ function renderTaskList(el) {
             ${renderStatus(el.statusCode)}
          </select> */}
 
-function renderStatus(el){
-    let tempHTML='';
+function renderStatus(el) {
+    let tempHTML = '';
     for (let i = 1001; i < 1006; i++) {
-        if(i != el){
-           tempHTML+=`<option value="1">${checkStatus(i)}</option>`
+        if (i != el) {
+            tempHTML += `<option value="1">${checkStatus(i)}</option>`
         }
     }
     return tempHTML;
