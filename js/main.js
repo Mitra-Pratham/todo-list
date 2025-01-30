@@ -247,13 +247,13 @@ function renderDateList(data) {
     let tempHtml = data.map(function (el) {
         return `
          <div id="date-item-${el.id}" class="mb-4 p-3 date-item">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="d-flex align-items-center">
-                        <div class="d-flex align-items-center">
-                            <h4 class="mb-0">${el.name}</h4>
-                            <p class="fs-6 text-muted ms-2 mb-0">(${renderTaskListCount(el.taskList)}/${el.taskList.length})</p>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="d-flex align-items-start">
+                        <div class="d-grid">
+                            <h4 class="mb-1">${el.name}</h4>
+                            <p class="tasks-summary">${renderTaskListCount(el.taskList)} tasks completed out of ${el.taskList.length}</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-lite-bg ms-2 todo-date-delete" value="${el.id}">
+                        <button type="button" class="btn btn-sm btn-lite-bg ms-3 todo-date-delete" value="${el.id}">
                             <i class="fa-solid fa-trash"></i>
                             <span class="btn-title">Delete Date List</span>
                         </button>
@@ -283,7 +283,7 @@ function renderDateNav(data) {
          <div class="p-1">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <a class="btn btn-lite-sm btn-no-bg" href="#date-item-${el.id}">${el.name} (${renderTaskListCount(el.taskList)}/${el.taskList.length})</a>
+                        <a class="btn btn-lite-sm btn-no-bg" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length})</span></a>
                     </div>
                 </div>
             </div>
@@ -292,6 +292,7 @@ function renderDateNav(data) {
     $(`#date-list-nav-container`).append(tempHtml);
 }
 
+//function to count completed vs incomplete tasks
 function renderTaskListCount(taskList) {
     let count = 0;
     taskList.forEach(el => {
