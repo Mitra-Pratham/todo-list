@@ -25,6 +25,13 @@ body {
     border-radius: var(--button-radius);
 }
 
+.btn-no-bg-gray{
+    color: var(--bs-gray-500);
+    background: transparent;
+    transition: all ease .3s;
+    border-radius: var(--button-radius);
+}
+
 .btn-lite-bg {
     color: rgb(var(--bs-primary-rgb));
     background: rgba(var(--bs-primary-rgb), 0.1);
@@ -33,7 +40,8 @@ body {
 }
 
 .btn-lite-bg:hover,
-.btn-no-bg:hover {
+.btn-no-bg:hover,
+.btn-no-bg-gray:hover {
     color: rgb(var(--bs-primary-rgb));
     background: rgba(var(--bs-primary-rgb), 0.3);
 }

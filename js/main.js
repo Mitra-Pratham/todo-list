@@ -122,11 +122,11 @@ $('#date-list-container').on('click', '.todo-date-delete', function () {
 });
 
 //+ button event listener to create the task item
-$('#date-list-container').on('click', '.todo-task-submit', function () {
-    let taskName = $(this).prev().children('.create-task-input').val().trim();
-    let dateID = $(this).prev().children('.create-task-input').attr('id').slice(11);
-    createTask(taskName, dateID);
-});
+// $('#date-list-container').on('click', '.todo-task-submit', function () {
+//     let taskName = $(this).prev().children('.create-task-input').val().trim();
+//     let dateID = $(this).prev().children('.create-task-input').attr('id').slice(11);
+//     createTask(taskName, dateID,'','');
+// });
 
 //keydown 'enter' event listener to create the task item
 $('#date-list-container').on('keydown', '.create-task-input', function (e) {
@@ -135,7 +135,7 @@ $('#date-list-container').on('keydown', '.create-task-input', function (e) {
     switch (e.keyCode) {
         case 13:
             {
-                createTask(taskName, dateID, this);
+                createTask(taskName, dateID, this, '');
 
             }
         default:
@@ -246,14 +246,14 @@ function renderDateList(data) {
     $('#date-list-container').empty();
     let tempHtml = data.map(function (el) {
         return `
-         <div id="date-item-${el.id}" class="mb-4 p-3 date-item">
+         <div id="date-item-${el.id}" class="mb-4 p-3 date-item" ondrop="drop(event)" ondragover="allowDrop(event)" value="${el.id}">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div class="d-flex align-items-start">
                         <div class="d-grid">
                             <h4 class="mb-1">${el.name}</h4>
                             <p class="tasks-summary">${renderTaskListCount(el.taskList)} tasks completed out of ${el.taskList.length}</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-lite-bg ms-3 todo-date-delete" value="${el.id}">
+                        <button type="button" class="btn btn-sm btn-no-bg-gray ms-2 todo-date-delete" value="${el.id}">
                             <i class="fa-solid fa-trash"></i>
                             <span class="btn-title">Delete Date List</span>
                         </button>
@@ -312,7 +312,7 @@ function renderTaskListCount(taskList) {
 //function to render the task list HTML
 function renderTaskList(el) {
     return `
-    <li class="list-group-item d-flex align-items-center justify-content-between ${el.statusCode == 1001 ? '' : 'completed-task'}">
+    <li class="list-group-item d-flex align-items-center justify-content-between ${el.statusCode == 1001 ? '' : 'completed-task'}" draggable="true" ondragstart="drag(event)" value="${el.id}">
     <div class="task-name-container w-100">
         <button type="button" class="btn btn-sm btn-no-bg todo-task-check" value="${el.id}" statusCode="${el.statusCode}">
         <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
@@ -386,7 +386,7 @@ function deleteDateList(dateID) {
 }
 
 //Function to create tasks
-function createTask(taskName, dateID, el) {
+function createTask(taskName, dateID, el, desc, statusCode) {
 
     let createBoolean = false;
 
@@ -395,8 +395,8 @@ function createTask(taskName, dateID, el) {
             let tempObj = {
                 id: 'Task-' + dateID + "-" + Math.floor(Math.random() * 1000000000),
                 name: taskName,
-                statusCode: 1001,
-                desc: ''
+                statusCode: statusCode ? statusCode: 1001,
+                desc: desc ? desc: ''
             }
 
             el.taskList.push(tempObj);
@@ -429,12 +429,6 @@ function deleteTasks(dateID, taskID) {
 
 //function to update tasks
 function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
-    // let tempObj = {
-    //     id: taskID,
-    //     name: taskName,
-    //     statusCode: taskStatusCode,
-    //     desc: taskDetails
-    // }
 
     let newData = taskArray.map(function (el) {
 
@@ -455,7 +449,8 @@ function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
 
     createUpdateDateList(newData, 'success', 'Task Updated Successfully!');
 }
-
+    
+    
 
 
 //initialize the storage
