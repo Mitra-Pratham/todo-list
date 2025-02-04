@@ -7,9 +7,6 @@
 // 1004 - Completed
 // 1005 - Archived
 
-let taskArray = [];
-const dbName = "TasksDB";
-const storeName = "tasksData";
 
 
 //--------------DB Operations-------------------------
@@ -88,116 +85,6 @@ function loadTasksFromDB() {
         };
     }
 }
-
-//--------------------event listeners-------------------------------------
-
-//Creating and setting date lists
-$('#todo-date-input').val(new Date().toISOString().slice(0, 10));
-
-//+ button to create the date list
-$('#todo-date-submit').on('click', function () {
-    let inputDate = $('#todo-date-input').val();
-    let inputDateName = new Date(inputDate).toLocaleDateString('en-us', { weekday: "long", year: "numeric", month: "short", day: "numeric" });
-    let tempItem = {
-        id: inputDate,
-        name: inputDateName,
-        taskList: [],
-        statusCode: 1001
-    }
-    if (taskArray.some(e => e.id == inputDate) === false) {
-        taskArray.push(tempItem);
-
-        createUpdateDateList(taskArray, 'success', 'Date list successfully created!');
-    }
-    else {
-        setMessageState('failure', 'Date list already exists!');
-
-    }
-});
-
-//event listener to delete date list
-$('#date-list-container').on('click', '.todo-date-delete', function () {
-    let dateID = $(this).val();
-    deleteDateList(dateID);
-});
-
-//+ button event listener to create the task item
-// $('#date-list-container').on('click', '.todo-task-submit', function () {
-//     let taskName = $(this).prev().children('.create-task-input').val().trim();
-//     let dateID = $(this).prev().children('.create-task-input').attr('id').slice(11);
-//     createTask(taskName, dateID,'','');
-// });
-
-//keydown 'enter' event listener to create the task item
-$('#date-list-container').on('keydown', '.create-task-input', function (e) {
-    let taskName = $(this).val().trim();
-    let dateID = $(this).attr('id').slice(11);
-    switch (e.keyCode) {
-        case 13:
-            {
-                createTask(taskName, dateID, this, '');
-
-            }
-        default:
-            break;
-    }
-});
-
-//event listener to delete tasks from the delete button
-$('#date-list-container').on('click', '.todo-task-delete', function () {
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    deleteTasks(dateID, taskID);
-});
-
-//event listener to create the input field for editing the tasks
-$('#date-list-container').on('click', '.todo-task-edit', function () {
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    let value = $(this).parent().siblings('.task-name-container').find('.task-name').text().trim();
-    let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue="${value}" dateID="${dateID}" taskID="${taskID}" value="${value}"></input>`
-    $(this).parent().siblings('.task-name-container').find('.task-name').empty();
-    $(this).parent().siblings('.task-name-container').find('.task-name').append(updateTaskName);
-    $('#update-task-name').focus();
-});
-
-//event listener to take the input from the input field tasks from the edit button
-$('#date-list-container').on('keydown', '#update-task-name', function (e) {
-    if (e.keyCode == 13) {
-        let tempTaskName = $(this).val().trim();
-        let dateID = $(this).attr('dateid');
-        let taskID = $(this).attr('taskid');
-        updateTasks(dateID, taskID, tempTaskName, '', '');
-        $(this).remove();
-    }
-    else if (e.keyCode == 27) {
-        let prevValue = $(this).attr('prevvalue');
-        $(this).parent().text(prevValue);
-        $(this).remove();
-    }
-});
-
-
-//event listener to create the input field for editing the tasks
-$('#date-list-container').on('click', '.todo-task-check', function () {
-
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    let statusCode = $(this).attr('statuscode');
-    let newStatusCode = statusCode == 1001 ? 1004 : 1001;
-    updateTasks(dateID, taskID, '', newStatusCode, '');
-
-});
-
-// //event listener to change the status field for tasks
-// $('#date-list-container').on('change', '.task-status', function () {
-//     let dateID = $(this).val().slice(5, 15);
-//     let taskID = $(this).val().slice(16);
-//     let placeholder = $(this).parent().siblings('.task-name').text();
-//     updateTasks(dateID, taskID, tempTaskStatus);
-// });
-
-
 
 ///----------------functions---------------------------
 
@@ -320,13 +207,16 @@ function renderTaskList(el) {
     <li class="list-group-item d-flex align-items-center justify-content-between ${el.statusCode == 1001 ? '' : 'completed-task'}" draggable="true" ondragstart="drag(event)" value="${el.id}">
     <div class="task-name-container w-100">
         <button type="button" class="btn btn-sm btn-no-bg todo-task-check" value="${el.id}" statusCode="${el.statusCode}">
-        <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
-        <span class="btn-title">${el.statusCode == 1001 ? 'Mark As Complete' : 'Move to To-Do'}</span>
-    </button>
+            <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
+            <span class="btn-title">${el.statusCode == 1001 ? 'Mark As Complete' : 'Move to To-Do'}</span>
+        </button>
+        <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail" value="${el.id}">
+                <i class="fa-solid fa-up-right-from-square"></i>
+                <span class="btn-title">View</span>
+        </button>
     <span class="task-name w-75">${el.name}</span>
     </div>
         <div class="d-flex">
-        
             <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${el.id}">
                 <i class="fa-solid fa-pencil"></i>
                 <span class="btn-title">Edit</span>
@@ -340,11 +230,119 @@ function renderTaskList(el) {
     `
 }
 
+// --------- Task Notes Detail View -------------
+
+
+    function createShortcuts() {
+        return (
+            shortcutKeys.map((el) => {
+                return `<div class="small-paras">${el.name} - <b>${el.keys}</b></div>`
+            }).join(""));
+    }
+
+    
+    function createButtons(array, color) {
+        return (
+            array.map((el) => {
+                return `<button class="btn-notes-ext" value="${el.value}">
+                    ${color ? colorAdd(el.value) : ''} ${color ? '' : el.name}<span class="btn-title">${el.name}</span></button>`
+            }).join(""));
+    
+        function colorAdd(value) {
+            return `<div value=${value} style="border:1px solid #ddd; border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`
+        }
+    }
+
+function renderTaskDetailHTML(el){
+    return `
+    <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
+            <div class="d-flex flex-column task-detail-title">
+                <h5 class="offcanvas-title">${el.name}</h5>
+                <p class="tasks-summary mb-0">${el.dateName}</p>
+            </div>
+            <div class="d-flex">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${el.id}">
+                <i class="fa-solid fa-pencil"></i>
+                <span class="btn-title">Edit</span>
+            </button>
+            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${el.id}">
+                <i class="fa-solid fa-trash"></i>
+                <span class="btn-title">Delete</span>
+            </button>
+            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2" data-bs-dismiss="offcanvas" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+                <span class="btn-title">Close</span>
+            </button>
+            </div>
+        </div>
+    <div id="task-detail-body" class="offcanvas-body">
+        ${createRTFToolbar()}
+        <div id="task-notes-area-parent">
+            <section id="task-notes-area" contenteditable="true" value="${el.id}">
+                ${el.desc}
+            </section>
+        </div>
+    </div>
+    `
+}
+
+function createRTFToolbar(){
+    return `
+        <div id="formatter-row">
+                <div id="rtf-buttons">
+                    <button class="btn btn-lite-sm btn-no-bg-gray headings-box">
+                    <i class="fa-solid fa-heading"></i>
+                    <span class="btn-title">Heading</span>
+                    </button>
+                    <div id="headings-box-container" class="task-box-ui-layout">
+                        ${createButtons(headingsArray)}
+                    </div>
+
+                    <button class="btn btn-lite-sm btn-no-bg-gray ol-box">
+                    <i class="fa-solid fa-list-ol"></i>
+                    <span class="btn-title">Ordered List - Ctrl + Shift + 9</span>
+                    </button>
+
+                    <button class="btn btn-lite-sm btn-no-bg-gray ul-box"">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span class=" btn-title">Unordered List - Tab</span>
+                    </button>
+
+                    <button class="btn btn-lite-sm btn-no-bg-gray colors-box">
+                    <i class="fa-solid fa-font"></i>
+                    <span class="btn-title">Font Color</span>
+                    </button>
+                    <div id="colors-box-container" class="task-box-ui-layout">
+                        ${createButtons(colorsArray, true)}
+                    </div>
+
+                    <button class="btn btn-lite-sm btn-no-bg-gray background-box">
+                    <i class="fa-solid fa-highlighter"></i>
+                     <span class="btn-title">BG Color</span>
+                    </button>
+                    <div id="background-box-container" class="task-box-ui-layout">
+                        ${createButtons(colorsArray, true)}
+                    </div>
+
+                    <button class="btn btn-lite-sm btn-no-bg-gray shortcuts-box">
+                    <i class="fa-solid fa-keyboard"></i>
+                    <span class="btn-title">Shortcuts</span>
+                    </button>
+                    <div id="shortcuts-box-container" class="task-box-ui-layout">
+                        ${createShortcuts()}
+                    </div>
+
+                </div>
+                <div id="saved-box-message" class="toaster-message">Your notes have been saved</div>
+            </div>
+    `
+}
+
 //status dropdown
-{/* <select class="form-select task-status" aria-label="Change Task Status" value="${el.id}">
+/* <select class="form-select task-status" aria-label="Change Task Status" value="${el.id}">
             <option selected>${checkStatus(el.statusCode)}</option>
             ${renderStatus(el.statusCode)}
-         </select> */}
+         </select> */
 
 function renderStatus(el) {
     let tempHTML = '';
@@ -441,10 +439,11 @@ function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
             el.taskList = el.taskList.map(function (el) {
 
                 if (el.id.slice(16) == taskID) {
-
                     taskName != '' ? el.name = taskName : '';
                     taskStatusCode != '' ? el.statusCode = taskStatusCode : '';
-                    taskDetails != '' ? el.taskDetails = taskDetails : '';
+                    if(taskDetails==true){
+                         el.desc = $('#task-notes-area').html();
+                    }
                 }
                 return el;
             });
@@ -454,7 +453,23 @@ function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
 
     createUpdateDateList(newData, 'success', 'Task Updated Successfully!');
 }
-    
+
+function findTask(dateID, taskID){
+    let tempTask = '';
+    let tempDateName = '';
+     taskArray.find(el => {
+        if (el.id === dateID) {
+            tempDateName = el.name;
+           el.taskList.find(el => {
+                if(el.id.slice(16) === taskID){
+                    tempTask =  el;
+                }
+            });
+        }
+    });
+    tempTask.dateName = tempDateName;
+    return tempTask;
+}
     
 
 

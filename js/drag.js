@@ -1,17 +1,3 @@
-//drag & drop
-
-// function onDragOverEvent(ev) {
-//     ev.preventDefault();
-//     let htmlID = $(ev.target).attr('id');
-//     console.log(htmlID);
-    
-//     $(`#${htmlID} .drag-group`).show();
-// }
-// function onDragLeaveEvent(ev) {
-//     ev.preventDefault();
-//     let htmlID = $(ev.target).attr('id');
-//     $(`#${htmlID} .drag-group`).hide();
-// }
 function allowDrop(ev) {
     ev.preventDefault();
 }
@@ -28,27 +14,14 @@ function drop(ev) {
     ev.preventDefault();
     let fName = ev.dataTransfer.getData("text");
     let fProp = JSON.parse(fName);
-    let oldTaskId = fProp.value.slice(16);
-    let oldDateId = fProp.value.slice(5,15);
-    let newDateId = $(ev.target).attr('value');
-    let newObj = '';
-    console.log(oldTaskId, oldDateId, newDateId);
-    
-    taskArray.forEach(el => {
-        if (el.id === oldDateId) {
-           el.taskList.forEach(el => {
-                
-                if(el.id.slice(16) === oldTaskId){
-                    newObj =  el;
-                }
-            });
-        }
-    });
-    console.log(newObj);
-   if(newDateId!=undefined && newObj!=undefined && newObj!='' && newDateId.length == oldDateId.length){
-    deleteTasks(oldDateId, oldTaskId);
-    createTask(newObj.name, newDateId, '', newObj.desc, newObj.statusCode);
-   }
-   $(`.drag-group`).hide();
+    let oldTaskID = fProp.value.slice(16);
+    let oldDateID = fProp.value.slice(5, 15);
+    let newDateID = $(ev.target).attr('value');
+    let newObj = findTask(oldDateID, oldTaskID);
+    if (newDateID != undefined && newObj != undefined && newObj != '' && newDateID.length == oldDateID.length) {
+        deleteTasks(oldDateID, oldTaskID);
+        createTask(newObj.name, newDateID, '', newObj.desc, newObj.statusCode);
+    }
+    $(`.drag-group`).hide();
 
 }

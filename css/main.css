@@ -9,6 +9,10 @@ body {
     scroll-behavior: smooth;
 }
 
+.offcanvas{
+    --bs-offcanvas-width: 35vw;
+}
+
 .btn {
     position: relative;
 }
@@ -41,7 +45,8 @@ body {
 
 .btn-lite-bg:hover,
 .btn-no-bg:hover,
-.btn-no-bg-gray:hover {
+.btn-no-bg-gray:hover,
+.btn-no-bg-gray-active {
     color: rgb(var(--bs-primary-rgb));
     background: rgba(var(--bs-primary-rgb), 0.3);
 }
@@ -53,8 +58,8 @@ body {
 .btn-title {
     display: none;
     position: absolute;
-    top: -32px;
-    left: 6px;
+    top: 32px;
+    left: -10px;
     background: rgba(0, 0, 0, 0.9);
     font-size: .8rem;
     color: white;
@@ -68,12 +73,22 @@ body {
     display: block;
 }
 
+#todo-date-form{
+    display: grid;
+    grid-template-columns: 15vw 1fr;
+    gap: 1rem;
+}
 
-.alert {
-    display: none;
-    position: fixed;
-    right: 16px;
+.alerts {
+    display: grid;
+    gap:.5rem;
     z-index: 99;
+    .alert{
+        display: none;
+        font-size: .75rem;
+        padding: .5rem;
+        margin: 0;
+    }
 }
 
 #date-parent-container {
@@ -148,9 +163,20 @@ input:hover {
 }
 
 .completed-task {
-    text-decoration: line-through;
+    .task-name{
+        text-decoration: line-through;
+    }
     color: var(--bs-gray-500);
     background-color: var(--bs-gray-100);
+}
+
+.todo-task-check{
+    padding-left: 0;
+}
+
+.todo-task-check:hover{
+    padding-left: .5rem;
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
 }
 
 .tasks-summary {
@@ -167,3 +193,132 @@ input:hover {
         border: 2px dashed rgba(var(--bs-primary-rgb),0.4);
     }
 }
+
+/* notes area css */
+
+#task-notes-area-parent {
+    display: grid;
+    /* grid-template-columns: 16% 84%; */
+    grid-template-columns: 1fr;
+    height: 100%;
+    gap: 6px
+  }
+  
+  #task-notes-area {
+    color: #000 !important;
+    font-size: 14px !important;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+    overflow: auto;
+  }
+  
+  #task-notes-area > * {
+    margin-bottom: 4px;
+  }
+  
+  #task-notes-area ol,
+  #task-notes-area ul {
+    padding-left: 12px !important;
+  }
+  
+  #task-notes-area ol li {
+    list-style: decimal !important;
+  }
+  
+  #task-notes-area ul li {
+      list-style: disc !important;
+    }
+  
+  #task-notes-area li {
+    margin-bottom: 4px;
+  }
+  
+  #task-notes-area a{
+    color:#0000EE;
+    text-decoration: underline;
+  }
+  
+  #task-notes-area h1,#task-notes-area h2,#task-notes-area h3,#task-notes-area h4,#task-notes-area h5,#task-notes-area p{
+    display: block !important;
+    color: #000 !important;
+    font-weight: normal !important;
+    padding: 0 !important;
+  }
+  
+  
+  #task-notes-area h1{
+    font-size: 2em !important;
+    margin-block-start: 0.67em;
+    margin-block-end: 0.67em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+  }
+  
+  #task-notes-area h2{
+    font-size: 1.5em !important;
+    font-size: 1.5em;
+      margin-block-start: 0.83em;
+      margin-block-end: 0.83em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+  }
+  
+  #task-notes-area h3{
+    font-size: 1.17em !important;
+    margin-block-start: 1em;
+    margin-block-end: 1em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+  }
+  
+  #task-notes-area h4 {
+    font-size: 1em !important;
+    margin-block-start: 1.33em;
+    margin-block-end: 1.33em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+  }
+  
+  #task-notes-area h5 {
+    font-size: 0.83em !important;
+    margin-block-start: 1.67em;
+    margin-block-end: 1.67em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+  }
+  
+  #task-notes-area h6 {
+    font-size: 0.67em !important;
+    margin-block-end: 2.33em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+  }
+  
+  #task-notes-area p{
+    font-size: 1em !important;
+    margin-block-start: 1em;
+    margin-block-end: 1em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+  }
+  
+  #task-notes-area:focus {
+    outline: 1px solid rgba(13, 110, 253, 1);
+    box-shadow: 0 0 16px rgba(13, 110, 253, 0.2);
+  }
+  
+  .task-box-ui-layout{
+    display: none;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    position: absolute;
+    padding: 6px;
+    border-radius: 6px;
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.1);
+    width:100%;
+    z-index: 10000;
+    top: 30px;
+    left: 0;
+  }
