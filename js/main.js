@@ -134,7 +134,7 @@ function renderDateList(data) {
     let tempHtml = data.map(function (el) {
         return `
          <div id="date-item-${el.id}" class="mb-4 p-3 date-item">
-                <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex align-items-start">
                         <div class="d-grid">
                             <h4 class="mb-1">${el.name}</h4>
