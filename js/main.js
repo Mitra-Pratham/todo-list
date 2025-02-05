@@ -210,7 +210,7 @@ function renderTaskList(el) {
             <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
             <span class="btn-title">${el.statusCode == 1001 ? 'Mark As Complete' : 'Move to To-Do'}</span>
         </button>
-        <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail" value="${el.id}">
+        <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail ${el.desc.length > 1 ? 'text-primary' : ''}" value="${el.id}">
                 <i class="fa-solid fa-up-right-from-square"></i>
                 <span class="btn-title">View</span>
         </button>
