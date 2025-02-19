@@ -137,21 +137,24 @@ function createSections() {
                 <button class="btn btn-lite-sm btn-no-bg-gray hide-section ${tempDisplay === 'none' ? 'section-hidden' : ''}">
                 <i class="fa-solid ${tempDisplay === 'none' ? 'fa-eye-slash' : 'fa-eye'}"></i>
                 </button>
-                <div class="edit-sections-container box-ui-layout">
-                        <button class="btn btn-lite-sm btn-no-bg-gray move-section" value="up">
-                            Move Up
-                        </button>
-                        <button class="btn btn-lite-sm btn-no-bg-gray move-section" value="down">
-                            Move Down
-                        </button>
-                        <button class="btn btn-lite-sm btn-no-bg-gray delete-section">
-                            Delete
-                        </button>
-                    </div>
+               
             </div>
         </div>`
         sectionToggleContainer.push(sectionToggle);
     }
+    // <div class="edit-sections-container box-ui-layout">
+    //     <button class="btn btn-lite-sm btn-no-bg-gray move-section" value="up">
+    //         Move Up
+    //     </button>
+    //     <button class="btn btn-lite-sm btn-no-bg-gray move-section" value="down">
+    //         Move Down
+    //     </button>
+    //     <button class="btn btn-lite-sm btn-no-bg-gray delete-section">
+    //         Delete
+    //     </button>
+    // </div>
+
+
     let addButtons = `
     <div class="notes-area-section-toggle-heading-container d-flex align-items-center justify-content-between ">
         <h6>Sections</h6>
@@ -173,7 +176,7 @@ function createSections() {
     $('.notes-detail-section-toggle-container').prepend(addButtons);
 }
 
-function addSections(val){
+function addSections(val) {
     let pageID = $('#notes-detail-area').attr('value');
     let randomID = `sections-area-${Date.now()}`
     let sectionsList = `
@@ -188,12 +191,12 @@ function createPage(text, fileName) {
     let tempName = fileName ? fileName : prompt('Enter page name', `Page ${$('.page-tab').length + 1}`);
     if (tempName != null) {
         tempID = `notes-area-${Date.now()}`,
-        tempObj = {
-            id: tempID,
-            name: tempName,
-            status: 1001,
-            html: text ? text : `<div id="sections-area-default" class="sections-area"><h2>${tempName}</h2></div>`
-        }
+            tempObj = {
+                id: tempID,
+                name: tempName,
+                status: 1001,
+                html: text ? text : `<div id="sections-area-default" class="sections-area"><h2>${tempName}</h2></div>`
+            }
         notesArray.push(tempObj);
         createPageTabs(notesArray);
         saveNotesToDB(notesArray);
@@ -202,7 +205,7 @@ function createPage(text, fileName) {
 
 function createPageTabs(items, id) {
     let tempHTML = items.map(el => {
-        return `<button id="${el.id}" class="btn btn-lite-sm btn-no-bg-gray page-tab ${id===el.id ? 'btn-no-bg-gray-active' : ''}">${el.name}</button>`
+        return `<button id="${el.id}" class="btn btn-lite-sm btn-no-bg-gray page-tab ${id === el.id ? 'btn-no-bg-gray-active' : ''}">${el.name}</button>`
     });
     $('#notes-detail-pages-tab-container').empty();
     $('#notes-detail-pages-tab-container').append(tempHTML);
@@ -236,6 +239,11 @@ function saveText(pageID) {
     saveNotesToDB(tempArray);
     createSections();
     notesArray = tempArray;
+    //show toaster on save
+    $('#saved-box-message').show();
+        setTimeout(() => {
+            $('#saved-box-message').hide();
+        }, 3000);
 }
 
 
