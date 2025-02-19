@@ -8,7 +8,6 @@
 // 1005 - Archived
 
 
-
 //--------------DB Operations-------------------------
 
 //Initialize IndexedDB
@@ -104,24 +103,6 @@ function createUpdateDateList(data, messageType, messageText) {
     renderDateNav(data);
     saveTasksToDB(data);
     setMessageState(messageType, messageText);
-}
-
-function bubbleSort(arr) {
-    let n = arr.length;
-
-    // Traverse through all array elements
-    for (let i = 0; i < n - 1; i++) {
-        for (let j = 0; j < n - 1 - i; j++) {
-            // Swap if element is greater than next index
-            let prevDate = new Date(arr[j].id).getTime();
-            let newDate = new Date(arr[j + 1].id).getTime();
-            if (prevDate > newDate) {
-                [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
-            }
-        }
-    }
-
-    return arr;
 }
 
 //function to render the date list HTML
@@ -232,27 +213,6 @@ function renderTaskList(el) {
 
 // --------- Task Notes Detail View -------------
 
-
-    function createShortcuts() {
-        return (
-            shortcutKeys.map((el) => {
-                return `<div class="small-paras">${el.name} - <b>${el.keys}</b></div>`
-            }).join(""));
-    }
-
-    
-    function createButtons(array, color) {
-        return (
-            array.map((el) => {
-                return `<button class="btn-notes-ext" value="${el.value}">
-                    ${color ? colorAdd(el.value) : ''} ${color ? '' : el.name}<span class="btn-title">${el.name}</span></button>`
-            }).join(""));
-    
-        function colorAdd(value) {
-            return `<div value=${value} style="border:1px solid #ddd; border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`
-        }
-    }
-
 function renderTaskDetailHTML(el){
     return `
     <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
@@ -283,58 +243,6 @@ function renderTaskDetailHTML(el){
             </section>
         </div>
     </div>
-    `
-}
-
-function createRTFToolbar(){
-    return `
-        <div id="formatter-row">
-                <div id="rtf-buttons">
-                    <button class="btn btn-lite-sm btn-no-bg-gray headings-box">
-                    <i class="fa-solid fa-heading"></i>
-                    <span class="btn-title">Heading</span>
-                    </button>
-                    <div id="headings-box-container" class="task-box-ui-layout">
-                        ${createButtons(headingsArray)}
-                    </div>
-
-                    <button class="btn btn-lite-sm btn-no-bg-gray ol-box">
-                    <i class="fa-solid fa-list-ol"></i>
-                    <span class="btn-title">Ordered List - Ctrl + Shift + 9</span>
-                    </button>
-
-                    <button class="btn btn-lite-sm btn-no-bg-gray ul-box"">
-                    <i class="fa-solid fa-list-ul"></i>
-                    <span class=" btn-title">Unordered List - Tab</span>
-                    </button>
-
-                    <button class="btn btn-lite-sm btn-no-bg-gray colors-box">
-                    <i class="fa-solid fa-font"></i>
-                    <span class="btn-title">Font Color</span>
-                    </button>
-                    <div id="colors-box-container" class="task-box-ui-layout">
-                        ${createButtons(colorsArray, true)}
-                    </div>
-
-                    <button class="btn btn-lite-sm btn-no-bg-gray background-box">
-                    <i class="fa-solid fa-highlighter"></i>
-                     <span class="btn-title">BG Color</span>
-                    </button>
-                    <div id="background-box-container" class="task-box-ui-layout">
-                        ${createButtons(colorsArray, true)}
-                    </div>
-
-                    <button class="btn btn-lite-sm btn-no-bg-gray shortcuts-box">
-                    <i class="fa-solid fa-keyboard"></i>
-                    <span class="btn-title">Shortcuts</span>
-                    </button>
-                    <div id="shortcuts-box-container" class="task-box-ui-layout">
-                        ${createShortcuts()}
-                    </div>
-
-                </div>
-                <div id="saved-box-message" class="toaster-message">Your notes have been saved</div>
-            </div>
     `
 }
 
@@ -475,3 +383,4 @@ function findTask(dateID, taskID){
 
 //initialize the storage
 initDB();
+
