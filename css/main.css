@@ -9,11 +9,11 @@ body {
   scroll-behavior: smooth;
 }
 
-.navbar{
+.navbar {
   margin: 1rem 1rem 0 1rem;
   background: var(--bs-light);
-    border: 1px solid var(--bs-gray-200);
-    border-radius: var(--card-radius);
+  border: 1px solid var(--bs-gray-200);
+  border-radius: var(--card-radius);
 }
 
 .offcanvas {
@@ -247,8 +247,6 @@ input:hover {
   height: calc(100vh - 100px);
   gap: .675rem;
   background: white;
-    border: 1px solid var(--bs-gray-200);
-    border-radius: var(--card-radius);
 }
 
 #notes-detail-area-parent {
@@ -258,7 +256,7 @@ input:hover {
   gap: .8rem;
 }
 
-#task-notes-area{
+#task-notes-area {
   color: #000 !important;
   font-size: 14px !important;
   background-color: #fff;
@@ -420,8 +418,8 @@ input:hover {
   gap: .25rem;
   padding: .8em;
   background: var(--bs-light);
-    border: 1px solid var(--bs-gray-200);
-    border-radius: var(--card-radius);
+  border: 1px solid var(--bs-gray-200);
+  border-radius: var(--card-radius);
   align-self: self-start;
   height: 100%;
   overflow: auto;
@@ -440,8 +438,8 @@ input:hover {
   gap: 0.5rem;
   padding: .5em;
   background: var(--bs-light);
-    border: 1px solid var(--bs-gray-200);
-    border-radius: var(--card-radius);
+  border: 1px solid var(--bs-gray-200);
+  border-radius: var(--card-radius);
 }
 
 #notes-detail-pages-tab-container {
@@ -485,7 +483,7 @@ input:hover {
   padding: 16px;
   background-color: white;
   border: 1px solid var(--bs-gray-400);
-  border-radius: 6px;
+  border-radius: var(--card-radius);
   margin: 8px;
 }
 
@@ -502,7 +500,7 @@ code {
   font-family: monospace;
   color: black;
   background: var(--bs-gray-200);
-    border: 1px solid var(--bs-gray-300);
-    border-radius: var(--card-radius);
+  border: 1px solid var(--bs-gray-300);
+  border-radius: var(--card-radius);
   padding: 0.5rem;
 }
