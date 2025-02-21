@@ -219,7 +219,7 @@ $('#task-detail-container').on('blur','#task-notes-area', function () {
 
  //keypress listener here for notes area
  $('#task-detail-container').on('keydown', '#task-notes-area', function (e) {
-    // shortcut tab
+    //get cursor position
     let sel = window.getSelection();
     let range = sel.getRangeAt(0);
     

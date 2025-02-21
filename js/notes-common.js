@@ -28,8 +28,12 @@ const shortcutKeys = [
         keys: `Tab`,
     },
     {
-        name: `Convert text to links`,
+        name: `Convert selection text to links`,
         keys: `Ctrl + K`,
+    },
+    {
+        name: `Convert selection to code block`,
+        keys: 'Ctrl + Shift + `',
     },
 ]
 const headingsArray = [
@@ -111,7 +115,7 @@ function bubbleSort(arr) {
 function createShortcuts() {
     return (
         shortcutKeys.map((el) => {
-            return `<div class="small-paras">${el.name} - <b>${el.keys}</b></div>`
+            return `<div class="mb-1">${el.name}: <b>${el.keys}</b></div>`
         }).join(""));
 }
 
@@ -168,9 +172,9 @@ function createRTFToolbar(){
 
                     <button class="btn btn-lite-sm btn-no-bg-gray shortcuts-box">
                     <i class="fa-solid fa-keyboard"></i>
-                    <span class="btn-title">Shortcuts</span>
                     </button>
                     <div id="shortcuts-box-container" class="task-box-ui-layout">
+                    <div class="fw-bold mb-2">Shortcuts</div>
                         ${createShortcuts()}
                     </div>
 

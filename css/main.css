@@ -9,6 +9,13 @@ body {
   scroll-behavior: smooth;
 }
 
+.navbar{
+  margin: 1rem 1rem 0 1rem;
+  background: var(--bs-light);
+    border: 1px solid var(--bs-gray-200);
+    border-radius: var(--card-radius);
+}
+
 .offcanvas {
   --bs-offcanvas-width: 35vw;
 }
@@ -25,7 +32,7 @@ body {
   font-size: 1rem;
 }
 
-.nav-link  {
+.nav-link {
   font-size: .875rem;
 }
 
@@ -238,24 +245,37 @@ input:hover {
   display: grid;
   grid-template-rows: auto auto 87%;
   height: calc(100vh - 100px);
-  gap: .675rem
+  gap: .675rem;
+  background: white;
+    border: 1px solid var(--bs-gray-200);
+    border-radius: var(--card-radius);
 }
 
 #notes-detail-area-parent {
   display: grid;
-  grid-template-columns: 16% 84%;
+  grid-template-columns: auto 85%;
   height: calc(100% - 1.5rem);
-  gap: 6px
+  gap: .8rem;
 }
 
-#task-notes-area,
-#notes-detail-area {
+#task-notes-area{
   color: #000 !important;
   font-size: 14px !important;
   background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--bs-gray-300);
+  border-radius: var(--card-radius);
   padding: 1rem;
+  overflow: auto;
+  margin-top: .675rem;
+}
+
+#notes-detail-area {
+  color: #000 !important;
+  font-size: 14px !important;
+  background: var(--bs-light);
+  border: 1px solid var(--bs-gray-200);
+  border-radius: var(--card-radius);
+  padding: .5rem;
   overflow: auto;
 }
 
@@ -385,10 +405,10 @@ input:hover {
   background-color: #fff;
   border: 1px solid #ddd;
   position: absolute;
-  padding: 6px;
+  padding: .675rem;
   border-radius: 6px;
   box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.1);
-  width: 100%;
+  width: max-content;
   z-index: 10000;
   top: 30px;
   left: 0;
@@ -398,9 +418,10 @@ input:hover {
   display: grid;
   align-content: start;
   gap: .25rem;
-  padding: .5em;
-  border: 1px solid #eee;
-  border-radius: 6px;
+  padding: .8em;
+  background: var(--bs-light);
+    border: 1px solid var(--bs-gray-200);
+    border-radius: var(--card-radius);
   align-self: self-start;
   height: 100%;
   overflow: auto;
@@ -418,8 +439,9 @@ input:hover {
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: .5em;
-  border: 1px solid #eee;
-  border-radius: 6px;
+  background: var(--bs-light);
+    border: 1px solid var(--bs-gray-200);
+    border-radius: var(--card-radius);
 }
 
 #notes-detail-pages-tab-container {
@@ -450,10 +472,20 @@ input:hover {
   gap: 2px;
 }
 
-.sections-area{
+.shortcuts-box:hover+#shortcuts-box-container {
+  display: block;
+}
+
+#shortcuts-box-container {
+  font-family: monospace;
+  font-size: .725rem;
+}
+
+.sections-area {
   padding: 16px;
-  border: 1px solid #aaa;
-  border-radius: 6px ;
+  background-color: white;
+  border: 1px solid var(--bs-gray-400);
+  border-radius: 6px;
   margin: 8px;
 }
 
@@ -461,7 +493,16 @@ input:hover {
   display: none;
   color: #0d6efd;
   font-size: .675rem;
-  padding:.3rem .6rem;
+  padding: .3rem .6rem;
   background-color: rgba(13, 110, 253, 0.1);
   border-radius: var(--button-radius);
+}
+
+code {
+  font-family: monospace;
+  color: black;
+  background: var(--bs-gray-200);
+    border: 1px solid var(--bs-gray-300);
+    border-radius: var(--card-radius);
+  padding: 0.5rem;
 }

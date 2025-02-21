@@ -132,7 +132,7 @@ function createSections() {
         let tempID = document.getElementsByClassName('sections-area')[i].id;
         let tempText = $('.sections-area h2').eq(i).text();
         let tempDisplay = document.getElementsByClassName('sections-area')[i].style.display;
-        let sectionToggle = `<div class="btn btn-lite-sm btn-no-bg-gray d-flex align-items-center justify-content-between text-start" tabindex="0" value="${tempID}" index=${i}>${tempText}
+        let sectionToggle = `<div class="btn btn-lite-sm btn-no-bg d-flex align-items-center justify-content-between text-start" tabindex="0" value="${tempID}" index=${i}>${tempText}
             <div class="">
                 <button class="btn btn-lite-sm btn-no-bg-gray hide-section ${tempDisplay === 'none' ? 'section-hidden' : ''}">
                 <i class="fa-solid ${tempDisplay === 'none' ? 'fa-eye-slash' : 'fa-eye'}"></i>
