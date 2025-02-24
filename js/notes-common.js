@@ -123,7 +123,7 @@ function createShortcuts() {
 function createButtons(array, color) {
     return (
         array.map((el) => {
-            return `<button class="btn-notes-ext" value="${el.value}">
+            return `<button class="btn btn-lite-sm btn-no-bg d-flex" value="${el.value}">
                 ${color ? colorAdd(el.value) : ''} ${color ? '' : el.name}<span class="btn-title">${el.name}</span></button>`
         }).join(""));
 

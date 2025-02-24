@@ -414,6 +414,29 @@ input:hover {
   left: 0;
 }
 
+#headings-box-container{
+  top: 30px;
+  left: 0;
+  
+}
+
+#colors-box-container{
+  top: 30px;
+  left: 70px;
+}
+
+#background-box-container{
+  top: 30px;
+  left: 100px;
+}
+
+#shortcuts-box-container{
+  top: 30px;
+  left: 120px;
+  font-family: monospace;
+  font-size: .725rem;
+}
+
 .notes-detail-section-toggle-container {
   display: grid;
   align-content: start;
@@ -476,11 +499,6 @@ input:hover {
   display: block;
 }
 
-#shortcuts-box-container {
-  font-family: monospace;
-  font-size: .725rem;
-}
-
 .sections-area {
   padding: 16px;
   background-color: white;
@@ -505,4 +523,8 @@ code {
   border: 1px solid var(--bs-gray-300);
   border-radius: var(--card-radius);
   padding: 0.5rem;
+}
+
+div:has(code), code + div{
+  margin-bottom: 1rem;
 }

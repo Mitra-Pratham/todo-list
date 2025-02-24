@@ -128,18 +128,32 @@ $('#date-list-container').on('click', '.todo-task-detail', function () {
 //--------------------Task Notes/Detail View----------------
 
 //headings box toggle
-$('#task-detail-container').on('click', '.headings-box', function () {
+$('#task-detail-container').on('mousedown', '.headings-box', function (e) {
+    e.preventDefault();
     $('.headings-box').toggleClass('btn-no-bg-gray-active');
     $('#headings-box-container').toggle();
 });
 
 //adding headings to notes area
-$('#task-detail-container').on('click','#headings-box-container button', function (e) {
+$('#task-detail-container').on('mousedown','#headings-box-container button', function (e) {
+    e.preventDefault();
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
-    let heading = e.target.value;
-    let headingElement = `<${heading}>Heading ${heading.slice(1, 2)}</${heading}>`;
-    $('#task-notes-area').append(headingElement);
+    let heading = $(this).attr('value');
+    let focus = $('#task-notes-area').is(':focus');
+        if (focus === true) {
+        let sel = window.getSelection();
+        let range = sel.getRangeAt(0);
+        let headingElement = document.createElement(`${heading}`);
+        headingElement.innerHTML = `${sel.toString()}`;
+        range.deleteContents();
+        range.insertNode(headingElement);
+    }
+    else {
+        let headingElement = `<${heading}>Heading ${heading.slice(1, 2)}</${heading}>`;
+        $('#task-notes-area').append(headingElement);
+
+    }
     updateTasks(dateID, taskID, '', '', true);
     $('#headings-box-container').hide();
     $('.headings-box').removeClass('btn-no-bg-gray-active');
