@@ -91,13 +91,14 @@ function loadNotesFromDB() {
 }
 
 ///----------------functions---------------------------
+{/* <h6 class="d-flex flex-column notes-detail-title mb-1">
+${el.name}
+</h6> */}
 
 function renderNotesDetailHTML(el) {
+    $('#notes-detail-title').text(el.name);
     let tempHTML = `
     <div id="notes-detail-title-container" class="">
-            <h6 class="d-flex flex-column notes-detail-title mb-1">
-                ${el.name}
-            </h6>
              ${createRTFToolbar()}
         </div>
         <div class="notes-detail-pages-container">

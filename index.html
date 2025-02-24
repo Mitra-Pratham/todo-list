@@ -25,19 +25,8 @@
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
-          <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
-            <div class="navbar-nav">
-              <a class="nav-link nav-active" href="index.html">To-Do List</a>
-              <a class="nav-link ms-2" href="notes.html">Notes</a>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-
-    <div class="my-3">
-        <div class="container-fluid">
-            <div id="todo-date-form" class="mb-4">
+          <div class="collapse navbar-collapse justify-content-between" id="navbarNavAltMarkup">
+            <div id="todo-date-form" class="my-sm-2">
                 <div class="d-flex align-items-end">
                     <input type="date" class="form-control" id="todo-date-input">
                     <button id="todo-date-submit" type="button" class="btn btn-sm btn-lite-bg ms-2">
@@ -54,6 +43,34 @@
                     </div>
                 </div>
             </div>
+            <div class="navbar-nav">
+              <a class="nav-link nav-active mb-sm-2" href="index.html">To-Do List</a>
+              <a class="nav-link ms-2 mb-sm-2" href="notes.html">Notes</a>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+
+    <div class="my-3">
+        <div class="container-fluid">
+            <!-- <div id="todo-date-form" class="mb-4">
+                <div class="d-flex align-items-end">
+                    <input type="date" class="form-control" id="todo-date-input">
+                    <button id="todo-date-submit" type="button" class="btn btn-sm btn-lite-bg ms-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span class="btn-title">Create Date List</span>
+                    </button>
+                </div>
+                <div class="alerts">
+                    <div id="success-message" class="alert alert-success" role="alert">
+                        Success!
+                    </div>
+                    <div id="failure-message" class="alert alert-danger" role="alert">
+                        Failures!
+                    </div>
+                </div>
+            </div> -->
             <div id="date-parent-container">
                 <div id="date-list-nav-container" class="p-2"></div>
                 <div id="date-list-container"></div>
