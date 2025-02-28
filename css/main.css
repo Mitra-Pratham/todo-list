@@ -127,6 +127,8 @@ body {
   border: 1px solid var(--bs-gray-200);
   border-radius: var(--card-radius);
   margin-right: 1rem;
+  height: 87vh;
+  overflow: auto;
   z-index: 99;
 }
 

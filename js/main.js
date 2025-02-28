@@ -149,20 +149,49 @@ function renderDateList(data) {
 
 //render the date list navigation
 function renderDateNav(data) {
-
     $('#date-list-nav-container').empty();
-    let tempHtml = data.map(function (el) {
-        return `
-         <div class="p-1">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center">
-                        <a class="btn btn-lite-sm btn-no-bg" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length})</span></a>
-                    </div>
-                </div>
-            </div>
-        `
+    let prevYear;
+    let yearHTML = data.map(function (year) {
+        let tempDate = new Date(year.id);
+        let tempYear = tempDate.getFullYear();
+        if (prevYear != tempYear) {
+            let prevMonth;
+            let monthHTML = data.map(function (month) {
+                let tempDate = new Date(month.id);
+                let tempMonthName = tempDate.toLocaleString('default', { month: 'long' });
+                let tempMonth = tempDate.getMonth();
+                if (prevMonth != tempMonth) {
+                    let dayHTML = data.map(function (date) {
+                        let tempDate = new Date(date.id);
+                        if (tempMonth === tempDate.getMonth()) {
+                            return dayItem(date)
+                        }
+                    });
+                    prevMonth = tempMonth;
+                    return monthYearNavItem(month.id, tempMonthName,dayHTML,2);
+                }
+
+            });
+            prevYear = tempYear;
+            return monthYearNavItem(year.id, tempYear,monthHTML,0);
+        }
     });
-    $(`#date-list-nav-container`).append(tempHtml);
+
+    $(`#date-list-nav-container`).append(yearHTML);
+}
+
+function dayItem(el){
+    return `
+            <div class="d-flex align-items-center border-start ms-2 py-1">
+                <a class="btn btn-lite-sm btn-no-bg text-start ms-2" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length}) ${renderTaskListCount(el.taskList) != el.taskList.length ? `<span class="text-danger ms-1">⬤</span>` : ''}</span></a>
+            </div>`
+}
+
+function monthYearNavItem(id,name,html,offset){
+    return `<div>
+    <a class="btn btn-lite-sm btn-no-bg ms-${offset}" href="#date-item-${id}"">${name}</a>
+    ${html.join('')}
+    </div>`
 }
 
 //function to count completed vs incomplete tasks
@@ -213,7 +242,7 @@ function renderTaskList(el) {
 
 // --------- Task Notes Detail View -------------
 
-function renderTaskDetailHTML(el){
+function renderTaskDetailHTML(el) {
     return `
     <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
             <div class="d-flex flex-column task-detail-title">
@@ -306,8 +335,8 @@ function createTask(taskName, dateID, el, desc, statusCode) {
             let tempObj = {
                 id: 'Task-' + dateID + "-" + Math.floor(Math.random() * 1000000000),
                 name: taskName,
-                statusCode: statusCode ? statusCode: 1001,
-                desc: desc ? desc: ''
+                statusCode: statusCode ? statusCode : 1001,
+                desc: desc ? desc : ''
             }
 
             el.taskList.push(tempObj);
@@ -349,8 +378,8 @@ function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
                 if (el.id.slice(16) == taskID) {
                     taskName != '' ? el.name = taskName : '';
                     taskStatusCode != '' ? el.statusCode = taskStatusCode : '';
-                    if(taskDetails==true){
-                         el.desc = $('#task-notes-area').html();
+                    if (taskDetails == true) {
+                        el.desc = $('#task-notes-area').html();
                     }
                 }
                 return el;
@@ -362,15 +391,15 @@ function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
     createUpdateDateList(newData, 'success', 'Task Updated Successfully!');
 }
 
-function findTask(dateID, taskID){
+function findTask(dateID, taskID) {
     let tempTask = '';
     let tempDateName = '';
-     taskArray.find(el => {
+    taskArray.find(el => {
         if (el.id === dateID) {
             tempDateName = el.name;
-           el.taskList.find(el => {
-                if(el.id.slice(16) === taskID){
-                    tempTask =  el;
+            el.taskList.find(el => {
+                if (el.id.slice(16) === taskID) {
+                    tempTask = el;
                 }
             });
         }
@@ -378,7 +407,7 @@ function findTask(dateID, taskID){
     tempTask.dateName = tempDateName;
     return tempTask;
 }
-    
+
 
 
 //initialize the storage
