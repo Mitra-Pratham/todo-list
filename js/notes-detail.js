@@ -249,8 +249,6 @@ function findPage(id) {
     return tempItem;
 }
 
-
-
 //saving the html
 function saveText(pageID, pageHTML, pageName) {
     let pageHTMLVal = $('#notes-detail-area').html();

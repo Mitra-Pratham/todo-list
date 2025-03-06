@@ -154,7 +154,7 @@ $('#notes-detail-container').on('click', '.delete-page', function(e){
     deletePage(pageID);
 });
 
-//renmaing the page event listener
+//renamaing the page event listener
 $('#notes-detail-container').on('click', '.rename-page', function(e){
     let pageID = $(this).parent().attr('value');
     let currentName = $(this).parent().prev().text().trim();
@@ -162,6 +162,45 @@ $('#notes-detail-container').on('click', '.rename-page', function(e){
     if(newName !==null){
         saveText(pageID,false,newName);
     }
+});
+
+//get filehandle for export
+async function getNewFileHandle(fileName) {
+    const options = {
+        suggestedName: fileName,
+        startIn: 'downloads',
+        types: [
+            {
+                description: 'Text Files',
+                accept: {
+                    'text/plain': ['.html'],
+                },
+            },
+        ],
+    };
+    const handle = await window.showSaveFilePicker(options);
+    return handle;
+}
+
+async function writeFile(fileHandle, contents) {
+    // Create a FileSystemWritableFileStream to write to.
+    const writable = await fileHandle.createWritable();
+    // Write the contents of the file to the stream.
+    await writable.write(contents);
+    // Close the file and write the contents to disk.
+    await writable.close();
+}
+
+//exporting the page
+$('#notes-detail-container').on('click', '.export-page', function(e){
+    let pageID = $(this).parent().attr('value');
+    let pageItem = findPage(pageID);
+    let currentName = $(this).parent().prev().text().trim();
+    let fileContents = pageItem.html;
+    getNewFileHandle(currentName).then((result) => {
+        writeFile(result, fileContents);
+        $('.section-open').hide().removeClass('section-open');
+    })
 });
 
 //keypress listener here for notes area
