@@ -135,7 +135,7 @@ function createSections() {
         let tempDisplay = document.getElementsByClassName('sections-area')[i].style.display;
         let sectionToggle = `<div class="btn btn-lite-sm btn-no-bg d-flex align-items-center justify-content-between text-start" tabindex="0" value="${tempID}" index=${i}>${tempText}
             <div class="">
-                <button class="btn btn-lite-sm btn-no-bg-gray hide-section ${tempDisplay === 'none' ? 'section-hidden' : ''}">
+                <button class="${commonButtonClasses} hide-section ${tempDisplay === 'none' ? 'section-hidden' : ''}">
                 <i class="fa-solid ${tempDisplay === 'none' ? 'fa-eye-slash' : 'fa-eye'}"></i>
                 </button>
                
@@ -144,13 +144,13 @@ function createSections() {
         sectionToggleContainer.push(sectionToggle);
     }
     // <div class="edit-sections-container box-ui-layout">
-    //     <button class="btn btn-lite-sm btn-no-bg-gray move-section" value="up">
+    //     <button class="${commonButtonClasses} move-section" value="up">
     //         Move Up
     //     </button>
-    //     <button class="btn btn-lite-sm btn-no-bg-gray move-section" value="down">
+    //     <button class="${commonButtonClasses} move-section" value="down">
     //         Move Down
     //     </button>
-    //     <button class="btn btn-lite-sm btn-no-bg-gray delete-section">
+    //     <button class="${commonButtonClasses} delete-section">
     //         Delete
     //     </button>
     // </div>
@@ -160,11 +160,11 @@ function createSections() {
     <div class="notes-area-section-toggle-heading-container d-flex align-items-center justify-content-between ">
         <h6>Sections</h6>
         <div class="notes-area-section-toggle-heading-icons">
-            <button class="btn btn-lite-sm btn-no-bg-gray add-sections-box" value="up">
+            <button class="${commonButtonClasses} add-sections-box" value="up">
                 <i class="fa-solid fa-square-caret-up"></i>
                 <span class="btn-title">Add Section Top</span>
             </button>
-            <button class="btn btn-lite-sm btn-no-bg-gray add-sections-box" value="down">
+            <button class="${commonButtonClasses} add-sections-box" value="down">
                 <i class="fa-solid fa-square-caret-down"></i>
                 <span class="btn-title">Add Section Bottom</span>
             </button>
@@ -183,12 +183,13 @@ function addSections(val) {
     let sectionsList = `
     <div id="${randomID}" class="sections-area"><h2>New Section</h2></div>`
     val === 'up' ? $('#notes-detail-area').prepend(sectionsList) : $('#notes-detail-area').append(sectionsList);
-    saveText(pageID);
+    saveText(pageID, true, false);
 }
 
 //creating a page
 function createPage(text, fileName) {
     let tempObj = {}
+    let tempID;
     let tempName = fileName ? fileName : prompt('Enter page name', `Page ${$('.page-tab').length + 1}`);
     if (tempName != null) {
         tempID = `notes-area-${Date.now()}`,
@@ -199,19 +200,48 @@ function createPage(text, fileName) {
                 html: text ? text : `<div id="sections-area-default" class="sections-area"><h2>${tempName}</h2></div>`
             }
         notesArray.push(tempObj);
-        createPageTabs(notesArray);
+        createPageTabs(notesArray, tempID);
         saveNotesToDB(notesArray);
+        let newObj = findPage(tempID);
+        renderNotesDetailHTML(newObj);
     }
 }
 
+//create the page tabs on the page nav
 function createPageTabs(items, id) {
     let tempHTML = items.map(el => {
-        return `<button id="${el.id}" class="btn btn-lite-sm btn-no-bg-gray page-tab ${id === el.id ? 'btn-no-bg-gray-active' : ''}">${el.name}</button>`
+        return `
+        <div class="position-relative d-flex align-items-center">
+            <button id="${el.id}" class="${commonButtonClasses} d-flex page-tab ${id === el.id ? 'btn-no-bg-gray-active' : ''}">${el.name}
+        </button>
+        <div value="${el.id}" class="task-box-ui-layout">
+            <button class="${commonButtonClasses} d-flex rename-page">Rename</button>
+            <button class="${commonButtonClasses} d-flex export-page">Export</button>
+            ${el.id === pageDefaultID ? '' : `<button class="${commonButtonClasses} d-flex delete-page">Delete
+            </button>`}
+        </div>
+        
+        </div>
+        `
     });
     $('#notes-detail-pages-tab-container').empty();
     $('#notes-detail-pages-tab-container').append(tempHTML);
 }
 
+//creating a page
+function deletePage(id) {
+    let input = confirm('Are you sure you want to delete this page?');
+    let activeID = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
+    let isActive = activeID === id ? pageDefaultID : activeID;
+    if (input === true) {
+        tempArray = notesArray.filter(el => el.id != id);
+        notesArray = tempArray;
+        saveNotesToDB(notesArray);
+        createPageTabs(notesArray, isActive);
+        let newObj = findPage(isActive);
+        renderNotesDetailHTML(newObj);
+    }
+}
 
 //finding a page
 function findPage(id) {
@@ -219,17 +249,18 @@ function findPage(id) {
     return tempItem;
 }
 
+
+
 //saving the html
-function saveText(pageID) {
-    let textArea = $('#notes-detail-area').html();
-    // let pageID = $('#notes-detail-area').attr('value');
+function saveText(pageID, pageHTML, pageName) {
+    let pageHTMLVal = $('#notes-detail-area').html();
     let tempArray = notesArray.map(function (el) {
         if (el.id === pageID) {
             let tempObj = {
                 id: el.id,
-                name: el.name,
+                name: pageName === false ? el.name : pageName,
                 status: el.status,
-                html: textArea
+                html: pageHTML === true ? pageHTMLVal : el.html
             }
             return tempObj;
         }
@@ -242,9 +273,14 @@ function saveText(pageID) {
     notesArray = tempArray;
     //show toaster on save
     $('#saved-box-message').show();
-        setTimeout(() => {
-            $('#saved-box-message').hide();
-        }, 3000);
+    setTimeout(() => {
+        $('#saved-box-message').hide();
+    }, 3000);
+    if(pageName !== false)
+    {
+        let activeID = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
+        createPageTabs(notesArray, activeID);
+    }
 }
 
 

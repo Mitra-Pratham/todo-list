@@ -93,6 +93,9 @@ const colorsArray = [
     },
 ]
 
+
+const commonButtonClasses = `btn btn-lite-sm btn-no-bg-gray`;
+
 //date sort in terms of ascending order
 function bubbleSort(arr) {
     let n = arr.length;
@@ -136,7 +139,7 @@ function createRTFToolbar(){
     return `
         <div id="notes-formatter-row">
                 <div id="rtf-buttons">
-                    <button class="btn btn-lite-sm btn-no-bg-gray headings-box">
+                    <button class="${commonButtonClasses} headings-box">
                     <i class="fa-solid fa-heading"></i>
                     <span class="btn-title">Heading</span>
                     </button>
@@ -144,17 +147,17 @@ function createRTFToolbar(){
                         ${createButtons(headingsArray)}
                     </div>
 
-                    <button class="btn btn-lite-sm btn-no-bg-gray ol-box">
+                    <button class="${commonButtonClasses} ol-box">
                     <i class="fa-solid fa-list-ol"></i>
                     <span class="btn-title">Ordered List - Ctrl + Shift + 9</span>
                     </button>
 
-                    <button class="btn btn-lite-sm btn-no-bg-gray ul-box"">
+                    <button class="${commonButtonClasses} ul-box"">
                     <i class="fa-solid fa-list-ul"></i>
                     <span class=" btn-title">Unordered List - Tab</span>
                     </button>
 
-                    <button class="btn btn-lite-sm btn-no-bg-gray colors-box">
+                    <button class="${commonButtonClasses} colors-box">
                     <i class="fa-solid fa-font"></i>
                     <span class="btn-title">Font Color</span>
                     </button>
@@ -162,7 +165,7 @@ function createRTFToolbar(){
                         ${createButtons(colorsArray, true)}
                     </div>
 
-                    <button class="btn btn-lite-sm btn-no-bg-gray background-box">
+                    <button class="${commonButtonClasses} background-box">
                     <i class="fa-solid fa-highlighter"></i>
                      <span class="btn-title">BG Color</span>
                     </button>
@@ -170,7 +173,7 @@ function createRTFToolbar(){
                         ${createButtons(colorsArray, true)}
                     </div>
 
-                    <button class="btn btn-lite-sm btn-no-bg-gray shortcuts-box">
+                    <button class="${commonButtonClasses} shortcuts-box">
                     <i class="fa-solid fa-keyboard"></i>
                     </button>
                     <div id="shortcuts-box-container" class="task-box-ui-layout">

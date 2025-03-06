@@ -1,7 +1,7 @@
 //saving notes
 $('#notes-detail-container').on('blur', '#notes-detail-area', function () {
     let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID);
+    saveText(pageID,true,false);
 });
 
 //headings box toggle
@@ -22,6 +22,7 @@ $('#notes-detail-container').on('mousedown', '.headings-box, .colors-box, .backg
     }
 });
 
+//common function to set background color, font color and heading based on selection
 function getSelectionInsertNode(type, value) {
     let HTMLElement = '';
     let sel = window.getSelection();
@@ -37,8 +38,6 @@ function getSelectionInsertNode(type, value) {
             {
                 HTMLElement = document.createElement(`span`);
                 HTMLElement.innerText = `${sel.toString()}`;
-                console.log(value);
-                
                 HTMLElement.style.color = value;
             }
             break;
@@ -73,7 +72,7 @@ $('#notes-detail-container').on('mousedown', '#headings-box-container button', f
 
     }
     let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID);
+    saveText(pageID,true,false);
     $('#headings-box-container').hide();
     $('.headings-box').removeClass('btn-no-bg-gray-active');
 });
@@ -87,7 +86,7 @@ $('#notes-detail-container').on('mousedown', '#colors-box-container button' , fu
         getSelectionInsertNode('color', color);
     }
     let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID);
+    saveText(pageID,true,false);
     $('#colors-box-container ').hide();
     $('.colors-box').removeClass('btn-no-bg-gray-active');
 
@@ -102,7 +101,7 @@ $('#notes-detail-container').on('mousedown', '#background-box-container button' 
         getSelectionInsertNode('background', bg);
     }
     let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID);
+    saveText(pageID,true,false);
     $('#background-box-container ').hide();
     $('.background-box').removeClass('btn-no-bg-gray-active');
 
@@ -131,10 +130,38 @@ $('#notes-detail-container').on('click', '#importPage', async function () {
     createPage(contents, fileName);
 });
 
+//navigate to page
 $('#notes-detail-container').on('click', '.page-tab', function (e) {
     let pageID = $(this).attr('id');
     let tempObj = findPage(pageID);
     renderNotesDetailHTML(tempObj);
+});
+
+//right click menu for pages
+$('#notes-detail-container').on('contextmenu', '.page-tab', function(e){
+    e.preventDefault();
+    let tempEL = $(this).next();
+    let tempElOpen = tempEL.hasClass('section-open');
+    $('.section-open').hide().removeClass('section-open');
+    if(!tempElOpen){
+        tempEL.show().addClass('section-open');
+    }
+});
+
+//deleting pages event listener
+$('#notes-detail-container').on('click', '.delete-page', function(e){
+    let pageID = $(this).parent().attr('value');
+    deletePage(pageID);
+});
+
+//renmaing the page event listener
+$('#notes-detail-container').on('click', '.rename-page', function(e){
+    let pageID = $(this).parent().attr('value');
+    let currentName = $(this).parent().prev().text().trim();
+    let newName = prompt('Rename the page', currentName);
+    if(newName !==null){
+        saveText(pageID,false,newName);
+    }
 });
 
 //keypress listener here for notes area
