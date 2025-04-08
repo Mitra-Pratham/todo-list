@@ -163,8 +163,11 @@ function renderDateNav(data) {
                 if (prevMonth != tempMonth) {
                     let dayHTML = data.map(function (date) {
                         let tempDate = new Date(date.id);
+                        let today = new Date().toLocaleDateString('fr-CA'); //converts time to YYYY-MM-DD
+                        let active = today === date.id ? true : false;
                         if (tempMonth === tempDate.getMonth()) {
-                            return dayItem(date)
+
+                            return dayItem(date, active)
                         }
                     });
                     prevMonth = tempMonth;
@@ -180,10 +183,10 @@ function renderDateNav(data) {
     $(`#date-list-nav-container`).append(yearHTML);
 }
 
-function dayItem(el){
+function dayItem(el, active){
     return `
             <div class="d-flex align-items-center border-start ms-2 py-1">
-                <a class="btn btn-lite-sm btn-no-bg text-start ms-2" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length}) ${renderTaskListCount(el.taskList) != el.taskList.length ? `<span class="text-danger ms-1">⬤</span>` : ''}</span></a>
+                <a class="btn btn-lite-sm btn-no-bg text-start ms-2 ${ active ? `btn-no-bg-gray-active` : ''}" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length}) ${renderTaskListCount(el.taskList) != el.taskList.length ? `<span class="text-danger ms-1">⬤</span>` : ''}</span></a>
             </div>`
 }
 
