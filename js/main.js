@@ -248,7 +248,7 @@ function renderTaskList(el) {
 function renderTaskDetailHTML(el) {
     return `
     <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
-            <div class="d-flex flex-column task-detail-title">
+            <div class="d-flex flex-column task-detail-title w-100">
                 <h5 class="offcanvas-title">${el.name}</h5>
                 <p class="tasks-summary mb-0">${el.dateName}</p>
             </div>

@@ -66,7 +66,9 @@ $('#date-list-container').on('click', '.todo-task-edit', function () {
     let dateID = $(this).val().slice(5, 15);
     let taskID = $(this).val().slice(16);
     let value = $(this).parent().siblings('.task-name-container').find('.task-name').text().trim();
-    let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue="${value}" dateID="${dateID}" taskID="${taskID}" value="${value}"></input>`
+    console.log(value);
+    
+    let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue='${value}' dateID='${dateID}' taskID='${taskID}' value='${value}'></input>`
     $(this).parent().siblings('.task-name-container').find('.task-name').empty();
     $(this).parent().siblings('.task-name-container').find('.task-name').append(updateTaskName);
     $('#update-task-name').focus();
@@ -77,7 +79,7 @@ $('#task-detail-container').on('click', '.todo-task-edit', function () {
     let dateID = $(this).val().slice(5, 15);
     let taskID = $(this).val().slice(16);
     let value = $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').text().trim();
-    let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue="${value}" dateID="${dateID}" taskID="${taskID}" value="${value}"></input>`
+    let updateTaskName = `<textarea id="update-task-name" class="w-100" type="text" prevValue='${value}' dateID='${dateID}' taskID='${taskID}' value='${value}'>${value}</textarea>`
     $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').empty();
     $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').append(updateTaskName);
     $('#update-task-name').focus();
