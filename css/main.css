@@ -249,7 +249,7 @@ input:hover {
 #notes-detail-container {
   display: grid;
   grid-template-rows: auto auto 87%;
-  height: calc(100vh - 100px);
+  height: calc(100vh - 44px);
   gap: .675rem;
   background: white;
 }
