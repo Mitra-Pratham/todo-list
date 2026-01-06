@@ -58,7 +58,6 @@ $('#date-list-container').on('click', '.todo-task-edit', function () {
     let dateID = $(this).val().slice(5, 15);
     let taskID = $(this).val().slice(16);
     let value = $(this).parent().siblings('.task-name-container').find('.task-name').text().trim();
-    console.log(value);
 
     let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue='${value}' dateID='${dateID}' taskID='${taskID}' value='${value}'></input>`
     $(this).parent().siblings('.task-name-container').find('.task-name').empty();

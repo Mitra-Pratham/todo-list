@@ -11,7 +11,7 @@ function initApp() {
     console.log("initApp called");
 
     const onLogin = async (user) => {
-        console.log("initAuth onLogin triggered, user:", user);
+        console.log("initAuth onLogin triggered, user:");
         $('#failure-message').hide();
 
         // Attempt migration if local data exists

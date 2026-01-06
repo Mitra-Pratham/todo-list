@@ -1,4 +1,4 @@
-import { initAuth } from "./auth.js";
+import { initAuth, getCurrentUser } from "./auth.js";
 import { TodoService } from "./todo-service.js";
 import { hasLocalData, getLocalTasks, migrateData } from "./migration.js";
 
@@ -6,7 +6,7 @@ let unsubscribe;
 
 function initApp() {
     initAuth(async (user) => {
-        console.log("User logged in:", user);
+        console.log("User logged in:");
 
         // Check for local data and migrate if needed
         if (await hasLocalData()) {

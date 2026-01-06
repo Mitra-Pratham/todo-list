@@ -17,7 +17,7 @@ export async function login() {
         });
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        console.log("User signed in:", user);
+        console.log("User signed in:");
     } catch (error) {
         console.error("Login failed:", error);
         alert("Login failed: " + error.message);
