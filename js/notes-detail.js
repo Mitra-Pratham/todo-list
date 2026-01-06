@@ -1,99 +1,70 @@
-// Notes Status Pipe
-// 1001 - Default
-// 1002 - Active
-//--------------DB Operations-------------------------
+import { initAuth, getCurrentUser } from './auth.js';
+import { TodoService } from './todo-service.js';
 
-//Initialize IndexedDB
+// Initialize App
+function initApp() {
+    initAuth((user) => {
+        if (user) {
+            console.log("User logged in:", user.uid);
+            // Subscribe to Notes
+            TodoService.subscribeNotes(user.uid, (data) => {
+                notesArray = data;
 
-function initDB() {
-    const request = indexedDB.open(dbName, 1);
-
-    request.onupgradeneeded = function (event) {
-        const db = event.target.result;
-
-        if (!db.objectStoreNames.contains(storeName)) {
-            db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
-        }
-    };
-
-    request.onsuccess = function () {
-        console.log("IndexedDB initialized");
-        loadNotesFromDB();
-    };
-
-    request.onerror = function () {
-        console.error("Error initializing IndexedDB", request.error);
-    };
-
-}
-
-//Save notes to IndexedDB
-function saveNotesToDB(data) {
-    const request = indexedDB.open(dbName, 1);
-
-    request.onsuccess = function (event) {
-        const db = event.target.result;
-        const transaction = db.transaction(storeName, "readwrite");
-        const store = transaction.objectStore(storeName);
-
-        //clear previous data
-        store.clear();
-
-        //add new data
-        data.forEach((note) => {
-            store.add(note);
-        });
-
-        transaction.oncomplete = function () {
-            console.log("Notes saved to IndexedDB");
-        };
-
-        transaction.onerror = function () {
-            console.error("Error saving to IndexedDB", transaction.error);
-        };
-    }
-}
-
-//Load notes from IndexedDB
-function loadNotesFromDB() {
-    const request = indexedDB.open(dbName, 1);
-
-    request.onsuccess = function (event) {
-        const db = event.target.result;
-        const transaction = db.transaction(storeName, "readonly");
-        const store = transaction.objectStore(storeName);
-
-        const getAllRequest = store.getAll();
-
-        getAllRequest.onsuccess = function () {
-
-            let defaultID = `notes-area-0000001`;
-            let defaultHTML = `<div id="sections-area-default" class="sections-area"><h2>Welcome to Notes!</h2></div>`
-
-            notesArray = [...getAllRequest.result];
-            if (notesArray[0] === undefined) {
-                notesArray = [
-                    {
+                // If no notes, create default
+                if (notesArray.length === 0) {
+                    let defaultID = `notes-area-0000001`;
+                    let defaultHTML = `<div id="sections-area-default" class="sections-area"><h2>Welcome to Notes!</h2></div>`
+                    let defaultNote = {
                         id: defaultID,
                         name: 'Default',
                         status: 1001,
                         html: defaultHTML
-                    }
-                ]
-            }
-            renderNotesDetailHTML(findPage(defaultID));
-        };
+                    };
+                    TodoService.saveNote(user.uid, defaultNote);
+                    return; // Wait for next update
+                }
 
-        getAllRequest.onerror = function () {
-            console.error("Error loading from IndexedDB", getAllRequest.error);
-        };
+                // Determine which page to show
+                let activePageId = $('#notes-detail-area').attr('value');
+                let pageToShow = notesArray.find(n => n.id === activePageId);
+
+                if (!pageToShow) {
+                    pageToShow = notesArray.find(n => n.id === pageDefaultID) || notesArray[0];
+                }
+
+                if (pageToShow) {
+                    createPageTabs(notesArray, pageToShow.id);
+
+                    // Check if we are currently editing this page
+                    let isFocused = $('#notes-detail-area').is(':focus');
+                    if (!isFocused || $('#notes-detail-area').attr('value') !== pageToShow.id) {
+                        renderNotesDetailHTML(pageToShow);
+                    }
+                }
+            });
+        } else {
+            console.log("User logged out");
+            notesArray = [];
+            $('#notes-detail-container').empty();
+            $('#notes-detail-pages-tab-container').empty();
+        }
+    });
+}
+
+//Save notes to Firestore
+// Helper to save a single note
+function saveSingleNoteToDB(note) {
+    const user = getCurrentUser();
+    if (user) {
+        TodoService.saveNote(user.uid, note);
     }
 }
 
+// Notes Status Pipe
+// 1001 - Default
+// 1002 - Active
+
 ///----------------functions---------------------------
-{/* <h6 class="d-flex flex-column notes-detail-title mb-1">
-${el.name}
-</h6> */}
 
 function renderNotesDetailHTML(el) {
     $('#notes-detail-title').text(el.name);
@@ -143,18 +114,6 @@ function createSections() {
         </div>`
         sectionToggleContainer.push(sectionToggle);
     }
-    // <div class="edit-sections-container box-ui-layout">
-    //     <button class="${commonButtonClasses} move-section" value="up">
-    //         Move Up
-    //     </button>
-    //     <button class="${commonButtonClasses} move-section" value="down">
-    //         Move Down
-    //     </button>
-    //     <button class="${commonButtonClasses} delete-section">
-    //         Delete
-    //     </button>
-    // </div>
-
 
     let addButtons = `
     <div class="notes-area-section-toggle-heading-container d-flex align-items-center justify-content-between ">
@@ -200,10 +159,9 @@ function createPage(text, fileName) {
                 html: text ? text : `<div id="sections-area-default" class="sections-area"><h2>${tempName}</h2></div>`
             }
         notesArray.push(tempObj);
+        saveSingleNoteToDB(tempObj);
+        renderNotesDetailHTML(tempObj);
         createPageTabs(notesArray, tempID);
-        saveNotesToDB(notesArray);
-        let newObj = findPage(tempID);
-        renderNotesDetailHTML(newObj);
     }
 }
 
@@ -234,9 +192,14 @@ function deletePage(id) {
     let activeID = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
     let isActive = activeID === id ? pageDefaultID : activeID;
     if (input === true) {
-        tempArray = notesArray.filter(el => el.id != id);
+        let tempArray = notesArray.filter(el => el.id != id);
+
+        const user = getCurrentUser();
+        if (user) {
+            TodoService.deleteNote(user.uid, id);
+        }
+
         notesArray = tempArray;
-        saveNotesToDB(notesArray);
         createPageTabs(notesArray, isActive);
         let newObj = findPage(isActive);
         renderNotesDetailHTML(newObj);
@@ -266,7 +229,13 @@ function saveText(pageID, pageHTML, pageName) {
             return el
         }
     });
-    saveNotesToDB(tempArray);
+
+    // Find the updated note and save it
+    const updatedNote = tempArray.find(n => n.id === pageID);
+    if (updatedNote) {
+        saveSingleNoteToDB(updatedNote);
+    }
+
     createSections();
     notesArray = tempArray;
     //show toaster on save
@@ -274,12 +243,19 @@ function saveText(pageID, pageHTML, pageName) {
     setTimeout(() => {
         $('#saved-box-message').hide();
     }, 3000);
-    if(pageName !== false)
-    {
+    if (pageName !== false) {
         let activeID = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
         createPageTabs(notesArray, activeID);
     }
 }
 
 
-initDB();
+// Make functions global for listeners
+window.createPage = createPage;
+window.deletePage = deletePage;
+window.saveText = saveText;
+window.addSections = addSections;
+window.findPage = findPage;
+window.renderNotesDetailHTML = renderNotesDetailHTML;
+
+initApp();

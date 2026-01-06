@@ -7,20 +7,12 @@ $('#todo-date-input').val(new Date().toISOString().slice(0, 10));
 $('#todo-date-submit').on('click', function () {
     let inputDate = $('#todo-date-input').val();
     let inputDateName = new Date(inputDate).toLocaleDateString('en-us', { weekday: "long", year: "numeric", month: "short", day: "numeric" });
-    let tempItem = {
-        id: inputDate,
-        name: inputDateName,
-        taskList: [],
-        statusCode: 1001
-    }
-    if (taskArray.some(e => e.id == inputDate) === false) {
-        taskArray.push(tempItem);
 
-        createUpdateDateList(taskArray, 'success', 'Date list successfully created!');
+    if (taskArray.some(e => e.id == inputDate) === false) {
+        createDateList(inputDate, inputDateName);
     }
     else {
         setMessageState('failure', 'Date list already exists!');
-
     }
 });
 
@@ -67,7 +59,7 @@ $('#date-list-container').on('click', '.todo-task-edit', function () {
     let taskID = $(this).val().slice(16);
     let value = $(this).parent().siblings('.task-name-container').find('.task-name').text().trim();
     console.log(value);
-    
+
     let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue='${value}' dateID='${dateID}' taskID='${taskID}' value='${value}'></input>`
     $(this).parent().siblings('.task-name-container').find('.task-name').empty();
     $(this).parent().siblings('.task-name-container').find('.task-name').append(updateTaskName);
@@ -92,7 +84,7 @@ $('#date-list-container, #task-detail-container').on('keydown', '#update-task-na
         let dateID = $(this).attr('dateid');
         let taskID = $(this).attr('taskid');
         updateTasks(dateID, taskID, tempTaskName, '', '');
-        if($(this).parent().hasClass('offcanvas-title')){
+        if ($(this).parent().hasClass('offcanvas-title')) {
             $(this).parent().text(tempTaskName);
         }
         $(this).remove();
@@ -120,7 +112,7 @@ $('#date-list-container').on('click', '.todo-task-detail', function () {
     bsOffcanvas.show();
     let dateID = $(this).val().slice(5, 15);
     let taskID = $(this).val().slice(16);
-    let newObj = findTask(dateID,taskID);
+    let newObj = findTask(dateID, taskID);
     $('#task-detail-container').empty();
     $('#task-detail-container').append(renderTaskDetailHTML(newObj));
 
@@ -137,13 +129,13 @@ $('#task-detail-container').on('mousedown', '.headings-box', function (e) {
 });
 
 //adding headings to notes area
-$('#task-detail-container').on('mousedown','#headings-box-container button', function (e) {
+$('#task-detail-container').on('mousedown', '#headings-box-container button', function (e) {
     e.preventDefault();
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
     let heading = $(this).attr('value');
     let focus = $('#task-notes-area').is(':focus');
-        if (focus === true) {
+    if (focus === true) {
         let sel = window.getSelection();
         let range = sel.getRangeAt(0);
         let headingElement = document.createElement(`${heading}`);
@@ -163,7 +155,7 @@ $('#task-detail-container').on('mousedown','#headings-box-container button', fun
 
 
 //adding ordered list to notes area
-$('#task-detail-container').on('click','.ol-box' , function (e) {
+$('#task-detail-container').on('click', '.ol-box', function (e) {
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
     let olList = `<ol><li>An Item here</li></ol>`
@@ -172,7 +164,7 @@ $('#task-detail-container').on('click','.ol-box' , function (e) {
 });
 
 //adding unordered list to notes area
-$('#task-detail-container').on('click','.ul-box' , function (e) {
+$('#task-detail-container').on('click', '.ul-box', function (e) {
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
     let ulList = `<ul><li>An Item here</li></ul>`
@@ -181,13 +173,13 @@ $('#task-detail-container').on('click','.ul-box' , function (e) {
 });
 
 //colors box toggle
-$('#task-detail-container').on('click','.colors-box' , function (){
+$('#task-detail-container').on('click', '.colors-box', function () {
     $('.colors-box').toggleClass('btn-no-bg-gray-active');
     $('#colors-box-container').toggle();
 });
 
 //adding color to selected font
-$('#task-detail-container').on('click', '#colors-box-container button' , function (e) {
+$('#task-detail-container').on('click', '#colors-box-container button', function (e) {
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
     //get cursor position
@@ -210,7 +202,7 @@ $('#task-detail-container').on('click', '.background-box', function () {
 });
 
 //adding background color to selected font
-$('#task-detail-container').on('click', '#background-box-container button' , function (e) {
+$('#task-detail-container').on('click', '#background-box-container button', function (e) {
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
     //get cursor position
@@ -227,18 +219,18 @@ $('#task-detail-container').on('click', '#background-box-container button' , fun
 });
 
 // save notes on blur
-$('#task-detail-container').on('blur','#task-notes-area', function () {
+$('#task-detail-container').on('blur', '#task-notes-area', function () {
     let dateID = $('#task-notes-area').attr('value').slice(5, 15);
     let taskID = $('#task-notes-area').attr('value').slice(16);
     updateTasks(dateID, taskID, '', '', true);
 });
 
- //keypress listener here for notes area
- $('#task-detail-container').on('keydown', '#task-notes-area', function (e) {
+//keypress listener here for notes area
+$('#task-detail-container').on('keydown', '#task-notes-area', function (e) {
     //get cursor position
     let sel = window.getSelection();
     let range = sel.getRangeAt(0);
-    
+
 
     switch (e.keyCode) {
         case 9:

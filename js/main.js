@@ -1,3 +1,6 @@
+import { initAuth, getCurrentUser } from "./auth.js";
+import { TodoService } from "./todo-service.js";
+
 // import * as navabr from '../js/navbar.js';
 
 // Status Pipe
@@ -12,78 +15,32 @@
 
 //Initialize IndexedDB
 
-function initDB() {
-    const request = indexedDB.open(dbName, 1);
+//--------------DB Operations-------------------------
 
-    request.onupgradeneeded = function (event) {
-        const db = event.target.result;
+let unsubscribe = null;
 
-        if (!db.objectStoreNames.contains(storeName)) {
-            db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
-        }
-    };
-
-    request.onsuccess = function () {
-        console.log("IndexedDB initialized");
-        loadTasksFromDB();
-    };
-
-    request.onerror = function () {
-        console.error("Error initializing IndexedDB", request.error);
-    };
-
-}
-
-//Save tasks to IndexedDB
-function saveTasksToDB(data) {
-    const request = indexedDB.open(dbName, 1);
-
-    request.onsuccess = function (event) {
-        const db = event.target.result;
-        const transaction = db.transaction(storeName, "readwrite");
-        const store = transaction.objectStore(storeName);
-
-        //clear previous data
-        store.clear();
-
-        //add new data
-        data.forEach((task) => {
-            store.add(task);
-        });
-
-        transaction.oncomplete = function () {
-            console.log("Tasks saved to IndexedDB");
-        };
-
-        transaction.onerror = function () {
-            console.error("Error saving to IndexedDB", transaction.error);
-        };
-    }
-}
-
-//Load tasks from IndexedDB
-function loadTasksFromDB() {
-    const request = indexedDB.open(dbName, 1);
-
-    request.onsuccess = function (event) {
-        const db = event.target.result;
-        const transaction = db.transaction(storeName, "readonly");
-        const store = transaction.objectStore(storeName);
-
-        const getAllRequest = store.getAll();
-
-        getAllRequest.onsuccess = function () {
-
-            taskArray = [...getAllRequest.result];
+// Initialize App
+function initApp() {
+    initAuth((user) => {
+        console.log("User logged in:", user.uid);
+        // Subscribe to data
+        if (unsubscribe) unsubscribe();
+        unsubscribe = TodoService.subscribe(user.uid, (data) => {
+            taskArray = data; // Update local state
             renderDateList(taskArray);
             renderDateNav(taskArray);
-        };
-
-        getAllRequest.onerror = function () {
-            console.error("Error loading from IndexedDB", getAllRequest.error);
-        };
-    }
+        });
+    }, () => {
+        console.log("User logged out");
+        if (unsubscribe) unsubscribe();
+        taskArray = [];
+        renderDateList([]);
+        renderDateNav([]);
+    });
 }
+
+// Start the app
+initApp();
 
 ///----------------functions---------------------------
 
@@ -98,10 +55,23 @@ function setMessageState(type, message) {
 }
 
 //create and update date and task lists
-function createUpdateDateList(data, messageType, messageText) {
-    renderDateList(data);
-    renderDateNav(data);
-    saveTasksToDB(data);
+//create and update date and task lists
+// NOTE: This function is now only used for creating NEW date lists, not for general updates
+// The reactive listener handles the UI updates.
+async function createUpdateDateList(data, messageType, messageText) {
+    // In the new reactive model, we don't manually render or save everything here.
+    // We just trigger the service action.
+    // However, for "Create Date List" button which passes the whole new array with the new date list:
+
+    // Find the new item (it's the one not in Firestore yet, but here we are passed the whole array)
+    // Actually, let's refactor the caller of this function to call TodoService directly.
+    // But to keep it compatible for now, let's see where it's called.
+    // It's called by deleteDateList, createTask, deleteTasks, updateTasks.
+
+    // We should refactor those functions instead.
+    // But if we must keep this signature for now:
+
+    // For now, let's just show the message. The data update should happen via Service.
     setMessageState(messageType, messageText);
 }
 
@@ -171,26 +141,26 @@ function renderDateNav(data) {
                         }
                     });
                     prevMonth = tempMonth;
-                    return monthYearNavItem(month.id, tempMonthName,dayHTML,2);
+                    return monthYearNavItem(month.id, tempMonthName, dayHTML, 2);
                 }
 
             });
             prevYear = tempYear;
-            return monthYearNavItem(year.id, tempYear,monthHTML,0);
+            return monthYearNavItem(year.id, tempYear, monthHTML, 0);
         }
     });
 
     $(`#date-list-nav-container`).append(yearHTML);
 }
 
-function dayItem(el, active){
+function dayItem(el, active) {
     return `
             <div class="d-flex align-items-center border-start ms-2 py-1">
-                <a class="btn btn-lite-sm btn-no-bg text-start ms-2 ${ active ? `btn-no-bg-gray-active` : ''}" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length}) ${renderTaskListCount(el.taskList) != el.taskList.length ? `<span class="text-danger ms-1">⬤</span>` : ''}</span></a>
+                <a class="btn btn-lite-sm btn-no-bg text-start ms-2 ${active ? `btn-no-bg-gray-active` : ''}" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length}) ${renderTaskListCount(el.taskList) != el.taskList.length ? `<span class="text-danger ms-1">⬤</span>` : ''}</span></a>
             </div>`
 }
 
-function monthYearNavItem(id,name,html,offset){
+function monthYearNavItem(id, name, html, offset) {
     return `<div>
     <a class="btn btn-lite-sm btn-no-bg ms-${offset}" href="#date-item-${id}"">${name}</a>
     ${html.join('')}
@@ -323,75 +293,79 @@ function checkStatus(el) {
 }
 
 //function to delete date list
-function deleteDateList(dateID) {
-    let newData = taskArray.filter(el => el.id != dateID);
-    createUpdateDateList(newData, 'success', 'Date list deleted successfully!');
+//function to delete date list
+async function deleteDateList(dateID) {
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
+
+    try {
+        await TodoService.deleteDateList(user.uid, dateID);
+        setMessageState('success', 'Date list deleted successfully!');
+    } catch (e) {
+        setMessageState('failure', 'Error deleting date list');
+    }
 }
 
 //Function to create tasks
-function createTask(taskName, dateID, el, desc, statusCode) {
+//Function to create tasks
+async function createTask(taskName, dateID, el, desc, statusCode) {
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
 
-    let createBoolean = false;
+    if (taskName === '') {
+        setMessageState('failure', 'Task name cannot be empty.');
+        return;
+    }
 
-    let newData = taskArray.map(function (el) {
-        if (el.id === dateID && taskName != '') {
-            let tempObj = {
-                id: 'Task-' + dateID + "-" + Math.floor(Math.random() * 1000000000),
-                name: taskName,
-                statusCode: statusCode ? statusCode : 1001,
-                desc: desc ? desc : ''
-            }
+    const newTask = {
+        id: 'Task-' + dateID + "-" + Math.floor(Math.random() * 1000000000),
+        name: taskName,
+        statusCode: statusCode ? statusCode : 1001,
+        desc: desc ? desc : ''
+    };
 
-            el.taskList.push(tempObj);
-            createBoolean = true;
-        }
-        return el;
-    });
-    if (createBoolean == true) {
-        createUpdateDateList(newData, 'success', 'Task created successfully created!');
+    try {
+        await TodoService.addTask(user.uid, dateID, newTask);
+        setMessageState('success', 'Task created successfully!');
         //refocus the create task input
         let tempID = $(el).attr('id');
         $(`#${tempID}`).focus();
-    }
-    else if (!createBoolean && taskName == '') {
-        setMessageState('failure', 'Task name cannot be empty.');
+    } catch (e) {
+        setMessageState('failure', 'Error creating task');
     }
 }
 
 //function to delete tasks
-function deleteTasks(dateID, taskID) {
+//function to delete tasks
+async function deleteTasks(dateID, taskID) {
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
 
-    let newData = taskArray.map(function (el) {
-        if (el.id === dateID) {
-            el.taskList = el.taskList.filter(el => el.id.slice(16) != taskID);
-        }
-        return el;
-    });
-    createUpdateDateList(newData, 'success', 'Task Deleted Successfully!');
+    try {
+        await TodoService.deleteTask(user.uid, dateID, taskID);
+        setMessageState('success', 'Task Deleted Successfully!');
+    } catch (e) {
+        setMessageState('failure', 'Error deleting task');
+    }
 }
 
 //function to update tasks
-function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
+//function to update tasks
+async function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
 
-    let newData = taskArray.map(function (el) {
+    const updates = {};
+    if (taskName !== '') updates.name = taskName;
+    if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
+    if (taskDetails === true) updates.desc = $('#task-notes-area').html();
 
-        if (el.id === dateID) {
-            el.taskList = el.taskList.map(function (el) {
-
-                if (el.id.slice(16) == taskID) {
-                    taskName != '' ? el.name = taskName : '';
-                    taskStatusCode != '' ? el.statusCode = taskStatusCode : '';
-                    if (taskDetails == true) {
-                        el.desc = $('#task-notes-area').html();
-                    }
-                }
-                return el;
-            });
-        }
-        return el;
-    });
-
-    createUpdateDateList(newData, 'success', 'Task Updated Successfully!');
+    try {
+        await TodoService.updateTask(user.uid, dateID, taskID, updates);
+        setMessageState('success', 'Task Updated Successfully!');
+    } catch (e) {
+        setMessageState('failure', 'Error updating task');
+    }
 }
 
 function findTask(dateID, taskID) {
@@ -414,5 +388,35 @@ function findTask(dateID, taskID) {
 
 
 //initialize the storage
-initDB();
+// Expose functions to window for legacy scripts and HTML attributes
+window.createTask = createTask;
+window.deleteTasks = deleteTasks;
+window.updateTasks = updateTasks;
+window.deleteDateList = deleteDateList;
+window.findTask = findTask;
+window.setMessageState = setMessageState;
+window.renderTaskDetailHTML = renderTaskDetailHTML; // Used in listeners.js
+
+// New helper for creating date list from listeners.js
+window.createDateList = async function (dateId, dateName) {
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
+
+    const newDateList = {
+        id: dateId,
+        name: dateName,
+        taskList: [],
+        statusCode: 1001
+    };
+
+    try {
+        await TodoService.saveDateList(user.uid, newDateList);
+        setMessageState('success', 'Date list successfully created!');
+    } catch (e) {
+        setMessageState('failure', 'Error creating date list');
+    }
+};
+
+//initialize the storage
+// initDB(); // Removed in favor of initApp()
 
