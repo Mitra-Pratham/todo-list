@@ -1,42 +1,72 @@
-import { initAuth, getCurrentUser } from "./auth.js";
+import { initAuth } from "./auth.js";
 import { TodoService } from "./todo-service.js";
+import { hasLocalData, getLocalTasks, migrateData } from "./migration.js";
 
-// import * as navabr from '../js/navbar.js';
+let unsubscribe;
 
-// Status Pipe
-// 1001 - To-do
-// 1002 - Ongoing
-// 1003 - Blocked
-// 1004 - Completed
-// 1005 - Archived
-
-
-//--------------DB Operations-------------------------
-
-//Initialize IndexedDB
-
-//--------------DB Operations-------------------------
-
-let unsubscribe = null;
-
-// Initialize App
 function initApp() {
-    initAuth((user) => {
-        console.log("User logged in:", user.uid);
-        // Subscribe to data
-        if (unsubscribe) unsubscribe();
+    initAuth(async (user) => {
+        console.log("User logged in:", user);
+
+        // Check for local data and migrate if needed
+        if (await hasLocalData()) {
+            const migrated = await migrateData(user.uid);
+            if (migrated) {
+                const successDiv = $('#success-message');
+                successDiv.html(`<strong>Success!</strong> Migration complete! Your data is now in the cloud.`);
+                successDiv.show();
+                setTimeout(() => successDiv.fadeOut(), 5000);
+            }
+        }
+
         unsubscribe = TodoService.subscribe(user.uid, (data) => {
-            taskArray = data; // Update local state
-            renderDateList(taskArray);
-            renderDateNav(taskArray);
+            renderDateList(data);
+            renderDateNav(data);
         });
-    }, () => {
+
+        // Hide warning if user logs in
+        $('#failure-message').hide();
+
+    }, async () => {
         console.log("User logged out");
         if (unsubscribe) unsubscribe();
-        taskArray = [];
-        renderDateList([]);
-        renderDateNav([]);
+
+        // Check for local data
+        if (await hasLocalData()) {
+            console.log("Found local data, displaying...");
+            const localTasks = await getLocalTasks();
+
+            // Set global taskArray for other functions to use
+            taskArray = bubbleSort(localTasks).reverse();
+
+            // renderDateList expects the array, and internally sets taskArray but let's be safe
+            // Actually renderDateList sets taskArray: taskArray = bubbleSort(data).reverse();
+            renderDateList(localTasks);
+            renderDateNav(localTasks);
+
+            showMigrationWarning();
+        } else {
+            taskArray = [];
+            renderDateList([]);
+            renderDateNav([]);
+        }
     });
+}
+
+// Helper to show migration warning
+function showMigrationWarning() {
+    // Use the failure-message alert div, repurposed as a warning for migration
+    const alertDiv = $('#failure-message');
+    if (alertDiv.length) {
+        alertDiv.removeClass('alert-danger').addClass('alert-warning');
+        alertDiv.html(`<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.`);
+        alertDiv.show();
+
+        $('#migration-login-link').off('click').on('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-btn').click();
+        });
+    }
 }
 
 // Start the app

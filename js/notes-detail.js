@@ -1,57 +1,137 @@
-import { initAuth, getCurrentUser } from './auth.js';
-import { TodoService } from './todo-service.js';
+import { TodoService } from "./todo-service.js";
+import { auth } from "./firebase-config.js";
+import { initAuth, getCurrentUser } from "./auth.js";
+import { migrateData, getLocalNotes } from "./migration.js";
 
-// Initialize App
+const commonButtonClasses = `btn btn-lite-sm btn-no-bg-gray`;
+console.log("notes-detail.js loaded"); // Verify module load
+const createRTFToolbar = window.createRTFToolbar; // Ensure access if it's on window
+
 function initApp() {
-    initAuth((user) => {
-        if (user) {
-            console.log("User logged in:", user.uid);
-            // Subscribe to Notes
-            TodoService.subscribeNotes(user.uid, (data) => {
-                notesArray = data;
+    console.log("initApp called");
 
-                // If no notes, create default
-                if (notesArray.length === 0) {
+    const onLogin = async (user) => {
+        console.log("initAuth onLogin triggered, user:", user);
+        $('#failure-message').hide();
+
+        // Attempt migration if local data exists
+        if (await migrateData(user.uid)) {
+            const successDiv = $('#success-message');
+            successDiv.html(`<strong>Success!</strong> Migration complete! Your data is now in the cloud.`);
+            successDiv.show();
+            setTimeout(() => successDiv.fadeOut(), 5000);
+        }
+
+        TodoService.subscribeNotes(user.uid, (notes) => {
+            notesArray = notes;
+            if (!notesArray || notesArray.length === 0) {
+                let defaultID = `notes-area-0000001`;
+                let defaultHTML = `<div id="sections-area-default" class="sections-area"><h2>Welcome to Notes!</h2></div>`
+                let defaultNote = {
+                    id: defaultID,
+                    name: 'Default',
+                    status: 1001,
+                    html: defaultHTML
+                };
+                TodoService.saveNote(user.uid, defaultNote);
+                return; // Wait for next update
+            }
+
+            // Determine which page to show
+            let activePageId = $('#notes-detail-area').attr('value');
+            let pageToShow = notesArray.find(n => n.id === activePageId);
+
+            if (!pageToShow) {
+                pageToShow = notesArray.find(n => n.id === pageDefaultID) || notesArray[0];
+            }
+
+            if (pageToShow) {
+                createPageTabs(notesArray, pageToShow.id);
+
+                // Check if we are currently editing this page
+                let isFocused = $('#notes-detail-area').is(':focus');
+                if (!isFocused || $('#notes-detail-area').attr('value') !== pageToShow.id) {
+                    renderNotesDetailHTML(pageToShow);
+                }
+            }
+        });
+    };
+
+    const onLogout = async () => {
+        console.log("initAuth onLogout triggered");
+        $('#failure-message').hide();
+        console.log("User logged out");
+
+        // Load local data for viewing only
+        console.log("Fetching local notes...");
+        try {
+            // Ensure createRTFToolbar is available
+            if (typeof createRTFToolbar !== 'function' && typeof window.createRTFToolbar === 'function') {
+                // const createRTFToolbar = window.createRTFToolbar; // Already defined at top
+            } else if (typeof createRTFToolbar !== 'function') {
+                console.error("createRTFToolbar is not defined!");
+                // Fallback stub to prevent crash
+                window.createRTFToolbar = () => '<div class="alert alert-danger">Toolbar error</div>';
+            }
+
+            getLocalNotes().then(localNotes => {
+                console.log("Local notes found:", localNotes ? localNotes.length : 0);
+                notesArray = localNotes;
+
+                if (!notesArray || notesArray.length === 0) {
+                    console.log("No local notes, creating default.");
+                    // Show default if no local data either
                     let defaultID = `notes-area-0000001`;
                     let defaultHTML = `<div id="sections-area-default" class="sections-area"><h2>Welcome to Notes!</h2></div>`
-                    let defaultNote = {
+                    notesArray = [{
                         id: defaultID,
                         name: 'Default',
                         status: 1001,
                         html: defaultHTML
-                    };
-                    TodoService.saveNote(user.uid, defaultNote);
-                    return; // Wait for next update
-                }
+                    }];
+                } else {
+                    console.log("Displaying local notes.");
+                    // Show warning banner only if we actually found local data
+                    // Use the failure-message alert div, repurposed as a warning for migration
+                    const alertDiv = $('#failure-message');
+                    if (alertDiv.length) {
+                        alertDiv.removeClass('alert-danger').addClass('alert-warning');
+                        alertDiv.html(`<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.`);
+                        alertDiv.show();
 
-                // Determine which page to show
-                let activePageId = $('#notes-detail-area').attr('value');
-                let pageToShow = notesArray.find(n => n.id === activePageId);
-
-                if (!pageToShow) {
-                    pageToShow = notesArray.find(n => n.id === pageDefaultID) || notesArray[0];
-                }
-
-                if (pageToShow) {
-                    createPageTabs(notesArray, pageToShow.id);
-
-                    // Check if we are currently editing this page
-                    let isFocused = $('#notes-detail-area').is(':focus');
-                    if (!isFocused || $('#notes-detail-area').attr('value') !== pageToShow.id) {
-                        renderNotesDetailHTML(pageToShow);
+                        $('#migration-login-link').off('click').on('click', (e) => {
+                            e.preventDefault();
+                            document.getElementById('login-btn').click();
+                        });
                     }
                 }
-            });
-        } else {
-            console.log("User logged out");
-            notesArray = [];
-            $('#notes-detail-container').empty();
-            $('#notes-detail-pages-tab-container').empty();
-        }
-    });
-}
 
-//Save notes to Firestore
+                // Render local notes
+                let activePageId = $('#notes-detail-area').attr('value');
+                let pageToShow = notesArray.find(n => n.id === activePageId) || notesArray[0];
+
+                if (pageToShow) {
+                    console.log("Rendering page:", pageToShow.id);
+                    renderNotesDetailHTML(pageToShow);
+                } else {
+                    console.error("No page to show!");
+                }
+
+                createPageTabs(notesArray, pageToShow ? pageToShow.id : null);
+
+            }).catch(e => {
+                console.error("Error loading local notes:", e);
+                notesArray = [];
+                $('#notes-detail-container').empty();
+                $('#notes-detail-pages-tab-container').empty();
+            });
+        } catch (err) {
+            console.error("Error in initApp local data flow:", err);
+        }
+    };
+
+    initAuth(onLogin, onLogout);
+}
 // Helper to save a single note
 function saveSingleNoteToDB(note) {
     const user = getCurrentUser();
