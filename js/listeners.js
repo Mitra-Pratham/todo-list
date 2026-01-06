@@ -114,7 +114,6 @@ $('#date-list-container').on('click', '.todo-task-detail', function () {
     let newObj = findTask(dateID, taskID);
     $('#task-detail-container').empty();
     $('#task-detail-container').append(renderTaskDetailHTML(newObj));
-
 });
 
 
