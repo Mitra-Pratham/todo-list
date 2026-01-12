@@ -217,7 +217,7 @@ function renderTaskListCount(taskList) {
 //function to render the task list HTML
 function renderTaskList(el) {
     return `
-    <li class="list-group-item d-flex align-items-center justify-content-between ${el.statusCode == 1001 ? '' : 'completed-task'}" draggable="true" ondragstart="drag(event)" value="${el.id}">
+    <li class="list-group-item d-flex align-items-center justify-content-between ${el.statusCode == 1001 ? '' : 'completed-task'}" draggable="true" ondragstart="drag(event)" value="${el.id}" statuscode="${el.statusCode}">
     <div class="task-name-container w-100">
         <button type="button" class="btn btn-sm btn-no-bg todo-task-check" value="${el.id}" statusCode="${el.statusCode}">
             <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
@@ -322,7 +322,7 @@ function checkStatus(el) {
     }
 }
 
-//function to delete date list
+
 //function to delete date list
 async function deleteDateList(dateID) {
     const user = getCurrentUser();
@@ -336,7 +336,7 @@ async function deleteDateList(dateID) {
     }
 }
 
-//Function to create tasks
+
 //Function to create tasks
 async function createTask(taskName, dateID, el, desc, statusCode) {
     const user = getCurrentUser();
@@ -366,7 +366,6 @@ async function createTask(taskName, dateID, el, desc, statusCode) {
 }
 
 //function to delete tasks
-//function to delete tasks
 async function deleteTasks(dateID, taskID) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
@@ -374,12 +373,14 @@ async function deleteTasks(dateID, taskID) {
     try {
         await TodoService.deleteTask(user.uid, dateID, taskID);
         setMessageState('success', 'Task Deleted Successfully!');
+        return true;
     } catch (e) {
         setMessageState('failure', 'Error deleting task');
+        return false;
     }
 }
 
-//function to update tasks
+
 //function to update tasks
 async function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
     const user = getCurrentUser();
@@ -426,6 +427,9 @@ window.deleteDateList = deleteDateList;
 window.findTask = findTask;
 window.setMessageState = setMessageState;
 window.renderTaskDetailHTML = renderTaskDetailHTML; // Used in listeners.js
+window.getSelectedList = getSelectedList;
+window.deleteSelectedList = deleteSelectedList;
+window.doneSelectedList = doneSelectedList;
 
 // New helper for creating date list from listeners.js
 window.createDateList = async function (dateId, dateName) {
@@ -450,3 +454,52 @@ window.createDateList = async function (dateId, dateName) {
 //initialize the storage
 // initDB(); // Removed in favor of initApp()
 
+// function to get selected list of tasks
+function getSelectedList() {
+    let selectedList = [];
+    $('.list-group-item-selected').each(function () {
+        let dateID = $(this).attr('value').slice(5, 15);
+        let taskID = $(this).attr('value').slice(16);
+        let statusCode = $(this).attr('statuscode');
+        selectedList.push({ dateID, taskID, statusCode });
+    });
+    return selectedList;
+}
+
+// function to delete selected list of tasks
+async function deleteSelectedList() {
+    let selectedList = getSelectedList();
+    for (const item of selectedList) {
+        try {
+
+            const result = await deleteTasks(item.dateID, item.taskID);
+            if (result) {
+                console.log("Continuing");
+                continue;
+            }
+        } catch (error) {
+            console.error('An error occurred:', error);
+
+        }
+    }
+    console.log('Loop finished')
+}
+
+// function to mark selected list of tasks as done/undone
+async function doneSelectedList() {
+    let selectedList = getSelectedList();
+    for (const item of selectedList) {
+        try {
+            let newStatusCode = item.statusCode == 1001 ? 1004 : 1001;
+            const result = await updateTasks(item.dateID, item.taskID, '', newStatusCode, '');
+            if (result) {
+                console.log("Continuing");
+                continue;
+            }
+        } catch (error) {
+            console.error('An error occurred:', error);
+
+        }
+    }
+    console.log('Loop finished')
+}

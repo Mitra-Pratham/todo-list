@@ -116,6 +116,24 @@ $('#date-list-container').on('click', '.todo-task-detail', function () {
     $('#task-detail-container').append(renderTaskDetailHTML(newObj));
 });
 
+// event listener to select multiple tasks
+$('#date-list-container').on('click', '.list-group-item', function (e) {
+    if (e.ctrlKey) {
+        $(this).toggleClass('list-group-item-selected');
+    } else {
+        console.log('Clicked without Ctrl key.');
+    }
+});
+
+//event listener to open context menu
+$('#date-list-container').on('contextmenu', '.list-group-item', function (e) {
+    e.preventDefault();
+    $('#context-menu').toggle().css({
+        left: e.pageX,
+        top: e.pageY
+    });
+});
+
 
 //--------------------Task Notes/Detail View----------------
 
