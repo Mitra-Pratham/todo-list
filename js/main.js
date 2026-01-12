@@ -128,7 +128,8 @@ function renderDateList(data) {
                     </div>
                     <div class="d-flex">
                         <div class="todo-input-form">
-                            <input type="text" class="form-control create-task-input" id="todo-input-${el.id}" placeholder="Add Task" size="75">
+                            <input type="text" class="form-control create-task-input" id="todo-input-${el.id}" placeholder="Add Task" 
+                            enterkeyhint="send"size="75">
                         </div>
                     </div>
                 </div>
