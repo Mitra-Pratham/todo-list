@@ -20,6 +20,35 @@ body {
   --bs-offcanvas-width: 35vw;
 }
 
+/* Make offcanvas take full width on smaller screens for better usability */
+@media screen and (max-width: 720px) {
+  .offcanvas {
+    --bs-offcanvas-width: 100vw;
+  }
+}
+
+/* Extra small screens: ensure offcanvas and nav are compact */
+@media screen and (max-width: 420px) {
+  .offcanvas {
+    --bs-offcanvas-width: 100vw;
+  }
+
+  /* target the offcanvas-end variant */
+  .offcanvas-end {
+    width: 100% !important;
+  }
+
+  /* Compact page paddings for very small devices */
+  body {
+    padding: 0 .25rem;
+  }
+
+  .container-fluid {
+    padding-left: .25rem;
+    padding-right: .25rem;
+  }
+}
+
 /* context menu */
 #context-menu {
   display: none;
@@ -116,8 +145,26 @@ body {
 
 #todo-date-form {
   display: grid;
-  grid-template-columns: 15vw 1fr;
+  grid-template-columns: minmax(120px, 15vw) 1fr;
   gap: 1rem;
+}
+
+@media screen and (max-width: 720px) {
+
+  /* Stack the date form on small screens */
+  #todo-date-form {
+    grid-template-columns: 1fr;
+    padding-top: 1em;
+  }
+
+  #todo-date-form .d-flex {
+    flex-direction: column;
+    gap: .5rem;
+  }
+
+  #todo-date-form input[type="date"] {
+    width: 100%;
+  }
 }
 
 .alerts {
@@ -135,8 +182,17 @@ body {
 
 #date-parent-container {
   display: grid;
-  grid-template-columns: 15vw 1fr;
+  grid-template-columns: minmax(160px, 15vw) 1fr;
   align-items: flex-start;
+  gap: 1rem;
+}
+
+@media screen and (max-width: 720px) {
+
+  /* single column on small screens (already partially handled below) */
+  #date-parent-container {
+    grid-template-columns: 1fr;
+  }
 }
 
 #date-list-nav-container {
@@ -151,6 +207,17 @@ body {
   z-index: 99;
 }
 
+/* Make the main list area breathe on all screen sizes */
+#date-list-container {
+  padding: .5rem;
+}
+
+@media screen and (max-width: 420px) {
+  #date-list-container {
+    padding: .25rem;
+  }
+}
+
 @media screen and (max-width: 720px) {
   #date-parent-container {
     grid-template-columns: 1fr;
@@ -159,6 +226,37 @@ body {
   #date-list-nav-container {
     position: relative;
     margin-bottom: 1rem;
+    height: auto;
+    max-height: 200px;
+    margin-right: 0;
+  }
+
+  /* Stack nav items and auth in a column for easier touch interaction */
+  .navbar .navbar-nav {
+    flex-direction: row;
+    gap: .5rem;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .navbar .alerts {
+    width: 100%;
+  }
+
+  #auth-container {
+    width: auto;
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+  }
+
+  .nav-link {
+    padding-left: .25rem;
+    padding-right: .25rem;
+  }
+
+  .date-item {
+    padding: .65rem;
   }
 }
 
@@ -554,4 +652,32 @@ code {
 div:has(code),
 code+div {
   margin-bottom: 1rem;
+}
+
+/* Small (phone) tweaks */
+@media screen and (max-width: 420px) {
+  .navbar {
+    margin: .25rem;
+  }
+
+  .nav-link {
+    font-size: .8rem;
+    padding-left: .25rem;
+    padding-right: .25rem;
+  }
+
+  #date-list-container {
+    padding: .5rem;
+  }
+
+  #date-list-nav-container {
+    margin-right: 0;
+    max-height: 60vh;
+  }
+
+  /* Compact inputs and buttons */
+  .btn {
+    padding: .35rem .6rem;
+    font-size: .85rem;
+  }
 }

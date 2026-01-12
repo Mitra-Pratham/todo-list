@@ -347,8 +347,10 @@ async function createTask(taskName, dateID, el, desc, statusCode) {
         return;
     }
 
+    let milliseconds = Date.now();
+
     const newTask = {
-        id: 'Task-' + dateID + "-" + Math.floor(Math.random() * 1000000000),
+        id: 'Task-' + dateID + "-" + milliseconds,
         name: taskName,
         statusCode: statusCode ? statusCode : 1001,
         desc: desc ? desc : ''
