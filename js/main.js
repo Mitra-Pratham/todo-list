@@ -1,10 +1,12 @@
 import { initAuth, getCurrentUser } from "./auth.js";
 import { TodoService } from "./todo-service.js";
 import { hasLocalData, getLocalTasks, migrateData } from "./migration.js";
+import { initAIUI } from "./ai-ui.js";
 
 let unsubscribe;
 
 function initApp() {
+    initAIUI();
     initAuth(async (user) => {
         console.log("User logged in:");
 
@@ -224,7 +226,7 @@ function renderTaskList(el) {
             <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
             <span class="btn-title">${el.statusCode == 1001 ? 'Mark As Complete' : 'Move to To-Do'}</span>
         </button>
-        <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail ${el.desc.length > 1 ? 'text-primary' : ''}" value="${el.id}">
+        <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail ${el.desc && el.desc.length > 1 ? 'text-primary' : ''}" value="${el.id}">
                 <i class="fa-solid fa-up-right-from-square"></i>
                 <span class="btn-title">View</span>
         </button>
@@ -439,17 +441,26 @@ window.createDateList = async function (dateId, dateName) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
-    const newDateList = {
-        id: dateId,
-        name: dateName,
-        taskList: [],
-        statusCode: 1001
-    };
-
     try {
+        // Check if it already exists to avoid overwriting tasks
+        const existing = await TodoService.getDateList(user.uid, dateId);
+        if (existing) {
+            console.log("Date list already exists:", existing);
+            setMessageState('success', 'Date list already exists.');
+            return; // Do nothing if it exists
+        }
+
+        const newDateList = {
+            id: dateId,
+            name: dateName,
+            taskList: [],
+            statusCode: 1001
+        };
+
         await TodoService.saveDateList(user.uid, newDateList);
         setMessageState('success', 'Date list successfully created!');
     } catch (e) {
+        console.error(e);
         setMessageState('failure', 'Error creating date list');
     }
 };

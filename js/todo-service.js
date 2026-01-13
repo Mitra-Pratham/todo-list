@@ -65,6 +65,22 @@ export const TodoService = {
         });
     },
 
+    // Get a specific Date List
+    async getDateList(userId, dateListId) {
+        if (!userId) return null;
+        try {
+            const docSnap = await getDoc(doc(db, "users", userId, COLLECTION_NAME, dateListId));
+            if (docSnap.exists()) {
+                return docSnap.data();
+            } else {
+                return null;
+            }
+        } catch (e) {
+            console.error("Error getting document: ", e);
+            throw e;
+        }
+    },
+
     // Create or Update a Date List (e.g. "Jan 6, 2025")
     async saveDateList(userId, dateList) {
         if (!userId) return;

@@ -14,6 +14,7 @@
         integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/ai.css">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -47,7 +48,12 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="navbar-nav align-items-center">
+                    <button id="ai-toggle-btn" class="btn btn-sm btn-lite-bg me-2" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#ai-sidebar" aria-controls="ai-sidebar">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i>Gemini AI
+                    </button>
                     <a class="nav-link nav-active mb-sm-2" href="index.html">To-Do List</a>
                     <a class="nav-link ms-2 mb-sm-2" href="notes.html">Notes</a>
 
@@ -76,6 +82,49 @@
         </div>
     </div>
 
+
+    <!-- AI Sidebar -->
+    <div class="offcanvas offcanvas-end" data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="ai-sidebar"
+        aria-labelledby="aiSidebarLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title" id="aiSidebarLabel"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Gemini
+                Assistant</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column p-0">
+            <!-- Settings / API Key -->
+            <div id="ai-settings" class="p-3 border-bottom bg-light">
+                <label for="gemini-api-key" class="form-label small fw-bold">Gemini API Key</label>
+                <div class="input-group input-group-sm mb-1">
+                    <input type="password" class="form-control" id="gemini-api-key" placeholder="Enter API Key">
+                    <button class="btn btn-outline-secondary" type="button" id="save-api-key">Save</button>
+                </div>
+                <div class="form-text small">
+                    Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI
+                        Studio</a>.
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="ai-chat-messages" class="flex-grow-1 p-3 overflow-auto">
+                <div class="ai-message system-message text-muted small text-center mb-3">
+                    Hi! I'm your AI assistant. I can help you manage your tasks.
+                </div>
+                <!-- Messages will be injected here -->
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-3 border-top">
+                <div class="input-group">
+                    <textarea class="form-control" id="ai-input" rows="1" placeholder="Type a message..."
+                        style="resize: none;"></textarea>
+                    <button class="btn btn-primary" type="button" id="ai-send-btn">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="offcanvas offcanvas-end" data-bs-scroll="true" data-bs-backdrop="false" id="task-detail-container">
 
