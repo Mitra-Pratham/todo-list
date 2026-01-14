@@ -1,8 +1,6 @@
 
 import { AIService, TOOLS_DEFINITION } from "./ai-service.js";
-import { TodoService } from "./todo-service.js";
 import { getCurrentUser } from "./auth.js";
-import { v4 as uuidv4 } from "https://jspm.dev/uuid";
 
 // Initialize AI Service
 const aiService = new AIService(localStorage.getItem("gemini_api_key") || "");
