@@ -1,142 +1,132 @@
 
 export class AIService {
-    constructor(apiKey) {
-        this.apiKey = apiKey;
-        this.baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
+    constructor() {
+        this.session = null;
     }
 
-    setApiKey(key) {
-        this.apiKey = key;
-    }
+    /**
+     * Check if Chrome AI is available and ready.
+     * @returns {Promise<string>} - 'no', 'readily', or 'after-download'
+     */
+    async checkAvailability() {
+        const ai = window.ai || (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
 
-    async chat(history, userMessage, tools) {
-        if (!this.apiKey) {
-            throw new Error("API Key not set");
+        if (!ai || !ai.languageModel) {
+            return 'no';
         }
 
-        const url = `${this.baseUrl}?key=${this.apiKey}`;
-
-        // Construct the request body
-        const contents = history.map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: msg.parts // expect parts to be an array of objects
-        }));
-
-        // Add the new user message
-        contents.push({
-            role: "user",
-            parts: [{ text: userMessage }]
-        });
-
-        const requestBody = {
-            contents: contents,
-            tools: [{
-                function_declarations: tools
-            }]
-        };
-
         try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || "Unknown error from Gemini API");
+            // New static availability() method (Chrome 140+)
+            if (typeof ai.languageModel.availability === 'function') {
+                const status = await ai.languageModel.availability();
+                console.log("Chrome AI availability() status:", status);
+                if (status === 'available') return 'readily';
+                if (status === 'downloadable' || status === 'downloading') return 'after-download';
+                return 'no';
             }
 
-            const data = await response.json();
-            return data;
+            // Older capabilities() method
+            if (typeof ai.languageModel.capabilities === 'function') {
+                const capabilities = await ai.languageModel.capabilities();
+                return capabilities.available;
+            }
+        } catch (e) {
+            console.error("AI availability check failed:", e);
+        }
+
+        return 'no';
+    }
+
+    /**
+     * Initialize a new chat session.
+     * @param {Function} onProgress - Callback for download progress (loaded, total)
+     */
+    async initSession(onProgress) {
+        if (this.session) return;
+
+        const ai = window.ai || (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
+
+        if (!ai || !ai.languageModel) {
+            throw new Error("Chrome AI API not found.");
+        }
+
+        try {
+            const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const todayISO = new Date().toISOString().split('T')[0];
+            const tomorrowDate = new Date();
+            tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+            const tomorrowISO = tomorrowDate.toISOString().split('T')[0];
+            const tomorrowName = tomorrowDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+
+            const options = {
+                systemPrompt: `You are a helpful to-do list assistant.
+                Today's date is ${today} & today's ISO date is ${todayISO}.
+                
+                CRITICAL INSTRUCTION: If the user asks you to add a task or create a list, you MUST include a structured command tag at the very end of your response.
+                
+                The tags are:
+                - {{CREATE_DATE_LIST: "YYYY-MM-DD", "Name of Date"}}
+                - {{ADD_TASK: "YYYY-MM-DD", "Task Description"}}
+                
+                You MUST use the exact YYYY-MM-DD format for dates. For "today", use "${todayISO}".
+                Actions will ONLY happen if you include these tags.`,
+
+                initialPrompts: [
+                    { role: 'user', content: 'Add a task to buy eggs today' },
+                    { role: 'assistant', content: `I've added "buy eggs" to your tasks for today. {{ADD_TASK: "${todayISO}", "buy eggs"}}` },
+                    { role: 'user', content: 'Create a list for January 25 for "Project Launch"' },
+                    { role: 'assistant', content: `I've created a new date list for January 25th. {{CREATE_DATE_LIST: "2026-01-25", "Sunday, January 25, 2026"}}` },
+                    { role: 'user', content: 'Create a list for tomorrow for "Project Launch"' },
+                    { role: 'assistant', content: `I've created a new date list for tomorrow. {{CREATE_DATE_LIST: "${tomorrowISO}", "${tomorrowName}"}}` },
+                    { role: 'user', content: 'Add "Prepare slides" to the January 25th list' },
+                    { role: 'assistant', content: `Added "Prepare slides" to your list for January 25th. {{ADD_TASK: "2026-01-25", "Prepare slides"}}` }
+                ]
+            };
+
+            if (onProgress) {
+                options.monitor = (m) => {
+                    m.addEventListener("downloadprogress", (e) => {
+                        onProgress(e.loaded, e.total);
+                    });
+                };
+            }
+
+            this.session = await ai.languageModel.create(options);
         } catch (error) {
-            console.error("Gemini API Error:", error);
+            console.error("Failed to create Chrome AI session:", error);
             throw error;
         }
     }
 
-    async sendToolResponse(history, functionResponses, tools) {
-        if (!this.apiKey) {
-            throw new Error("API Key not set");
+    /**
+     * Chat with the AI.
+     * @param {string} userMessage - The latest user message
+     */
+    async chat(userMessage) {
+        if (!this.session) {
+            await this.initSession();
         }
 
-        const url = `${this.baseUrl}?key=${this.apiKey}`;
-
-        // Construct request body with history (which includes the function call) 
-        // and the new function response
-        const requestBody = {
-            contents: [
-                ...history,
-                {
-                    role: "function",
-                    parts: functionResponses
-                }
-            ],
-            tools: [{
-                function_declarations: tools
-            }]
-        };
-
         try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || "Unknown error from Gemini API");
-            }
-
-            const data = await response.json();
-            return data;
+            const response = await this.session.prompt(userMessage);
+            return response;
         } catch (error) {
-            console.error("Gemini API Tool Response Error:", error);
+            console.error("Chrome AI Prompt Error:", error);
             throw error;
+        }
+    }
+
+    /**
+     * Destroy session to free up resources.
+     */
+    async destroy() {
+        if (this.session) {
+            this.session.destroy();
+            this.session = null;
         }
     }
 }
 
-export const TOOLS_DEFINITION = [
-    {
-        name: "create_date_list",
-        description: "Create a new to-do list for a specific date.",
-        parameters: {
-            type: "object",
-            properties: {
-                date_string: {
-                    type: "string",
-                    description: "The date for the list (e.g., '2025-01-20'). Format as YYYY-MM-DD if possible."
-                },
-                date_name: {
-                    type: "string",
-                    description: "The name of the list (e.g.,'Jan 20, 2025'). Format as MMM DD, YYYY if possible."
-                }
-            },
-            required: ["date_string", "date_name"]
-        }
-    },
-    {
-        name: "add_task",
-        description: "Add a task to a specific date list. If the list doesn't exist, you should create it first.",
-        parameters: {
-            type: "object",
-            properties: {
-                date_string: {
-                    type: "string",
-                    description: "The date of the list to add the task to."
-                },
-                task_text: {
-                    type: "string",
-                    description: "The content of the task."
-                }
-            },
-            required: ["date_string", "task_text"]
-        }
-    }
-];
+// Exporting dummy TOOLS for architecture consistency, though we use structured prompting here
+export const TOOLS_DEFINITION = [];
