@@ -75,6 +75,10 @@ body {
   font-size: .675rem;
 }
 
+.btn-lh-0 {
+  line-height: 0;
+}
+
 .btn-lite-sm-2x {
   font-size: 1rem;
 }
@@ -135,6 +139,7 @@ body {
   padding: 6px;
   border-radius: 4px;
   width: max-content;
+  line-height: normal;
   pointer-events: none;
   z-index: 10000;
 }
@@ -148,7 +153,8 @@ body {
   align-items: center;
   /* grid-template-columns: minmax(120px, 15vw) 1fr; */
   gap: 1rem;
-  #todo-date-submit{
+
+  #todo-date-submit {
     width: 100%;
   }
 
@@ -160,9 +166,10 @@ body {
   #todo-date-form {
     grid-template-columns: 1fr;
     padding: 1em;
-    #todo-date-submit{
-    width: auto;
-  }
+
+    #todo-date-submit {
+      width: auto;
+    }
   }
 
   #todo-date-form .d-flex {
@@ -242,14 +249,16 @@ body {
   /* Stack nav items and auth in a column for easier touch interaction */
   .navbar .navbar-nav {
     display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: .5rem;
-        align-items: flex-start;
-        width: 100%;
-        .nav-link, #auth-container {
-          text-align: center;
-          justify-content: center;
-        }
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+    align-items: flex-start;
+    width: 100%;
+
+    .nav-link,
+    #auth-container {
+      text-align: center;
+      justify-content: center;
+    }
   }
 
   .navbar .alerts {

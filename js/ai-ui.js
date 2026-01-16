@@ -14,6 +14,14 @@ const progressContainer = document.getElementById("ai-progress-container");
 const progressBar = document.getElementById("ai-progress-bar");
 const initBtnContainer = document.getElementById("ai-init-btn-container");
 const initBtn = document.getElementById("ai-init-btn");
+const imageInput = document.getElementById("ai-image-input");
+const imageBtn = document.getElementById("image-upload-btn") || document.getElementById("ai-image-btn");
+const imagePreviews = document.getElementById("ai-image-previews");
+const resetBtn = document.getElementById("ai-reset-btn");
+
+// State
+let isAIReady = false;
+let pendingImages = []; // Array of Blobs/Files
 
 // --- Diagnostics Helper ---
 async function getDetailedDiagnostics() {
@@ -48,9 +56,6 @@ async function getDetailedDiagnostics() {
     return report;
 }
 
-// State
-let isAIReady = false;
-
 // --- Initialization ---
 
 export async function initAIUI() {
@@ -63,11 +68,9 @@ export async function initAIUI() {
     }
 
     const diag = await getDetailedDiagnostics();
-    console.log("Chrome AI Debug Report:", diag);
 
     // Use the robust check from aiService
     const availabilityStatus = await aiService.checkAvailability();
-    console.log("Mapped Availability Status:", availabilityStatus);
 
     if (availabilityStatus === 'no') {
         // If it's no, but diag shows we have something, it might be a hardware/model issue
@@ -100,11 +103,52 @@ export async function initAIUI() {
         sendButton.onclick = handleSendMessage;
     }
 
+    if (imageBtn) {
+        imageBtn.onclick = () => imageInput.click();
+    }
+
+    if (imageInput) {
+        imageInput.onchange = (e) => handleImageFiles(e.target.files);
+    }
+
     if (inputField) {
+        inputField.onpaste = (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const files = [];
+            for (const item of items) {
+                if (item.type.indexOf("image") !== -1) {
+                    files.push(item.getAsFile());
+                }
+            }
+            if (files.length > 0) {
+                handleImageFiles(files);
+            }
+        };
+
         inputField.onkeydown = (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSendMessage();
+            }
+        };
+    }
+
+    if (resetBtn) {
+        resetBtn.onclick = async () => {
+            if (confirm("Reset AI conversation history to fix any errors?")) {
+                try {
+                    await aiService.destroy(); // This will force a new session on next message
+                    chatContainer.innerHTML = `
+                        <div class="ai-message system-message text-muted small text-center mb-3">
+                            Conversation history cleared. System prompt refreshed. How can I help you?
+                        </div>
+                    `;
+                    pendingImages = [];
+                    imagePreviews.innerHTML = "";
+                    inputField.value = "";
+                } catch (e) {
+                    console.error("Reset failed:", e);
+                }
             }
         };
     }
@@ -136,6 +180,48 @@ export async function initAIUI() {
     }
 }
 
+// --- Image Handling Helpers ---
+
+async function handleImageFiles(files) {
+    for (const file of files) {
+        if (pendingImages.length >= 5) {
+            alert("Maximum 5 images allowed per message.");
+            break;
+        }
+        const referenceImage = new Blob([file], { type: file.type });
+        pendingImages.push(referenceImage);
+        renderImagePreview(file);
+    }
+    // Clear input so same file can be selected again
+    if (imageInput) imageInput.value = "";
+}
+
+function renderImagePreview(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const div = document.createElement("div");
+        div.className = "ai-preview-item";
+        div.innerHTML = `
+            <img src="${e.target.result}" alt="Preview">
+            <button class="ai-preview-remove" title="Remove">&times;</button>
+        `;
+
+        div.querySelector(".ai-preview-remove").onclick = () => {
+            const index = pendingImages.indexOf(file);
+            if (index > -1) pendingImages.splice(index, 1);
+            div.remove();
+        };
+
+        imagePreviews.appendChild(div);
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearPendingImages() {
+    pendingImages = [];
+    if (imagePreviews) imagePreviews.innerHTML = "";
+}
+
 // --- Chat Logic ---
 
 async function handleSendMessage() {
@@ -145,20 +231,23 @@ async function handleSendMessage() {
     }
 
     const text = inputField.value.trim();
-    if (!text) return;
+    const imagesToSend = [...pendingImages];
 
-    // Clear input
+    if (!text && imagesToSend.length === 0) return;
+
+    // Clear UI inputs
     inputField.value = "";
+    clearPendingImages();
 
     // 1. Add User Message to UI
-    addMessageToUI("user", text);
+    addMessageToUI("user", text, imagesToSend);
 
     // 2. Show Typing Indicator
     const typingId = showTypingIndicator();
 
     try {
-        // 3. Call AI Service
-        const response = await aiService.chat(text);
+        // 3. Call AI Service with multimodal input
+        const response = await aiService.chat(text, imagesToSend);
 
         removeTypingIndicator(typingId);
 
@@ -177,7 +266,7 @@ async function handleSendMessage() {
 }
 
 async function processAIResponse(responseText) {
-    console.log("Raw AI Response:", responseText);
+    // const responseText = response; // Removed this incorrect line
 
     // 1. Extract commands from response
     // Commands are in format {{COMMAND: "arg1", "arg2"}}
@@ -190,7 +279,7 @@ async function processAIResponse(responseText) {
     while ((match = commandRegex.exec(responseText)) !== null) {
         const [fullMatch, cmdType, arg1, arg2] = match;
         commandsToExecute.push({ type: cmdType, arg1, arg2 });
-        console.log("Found Command:", cmdType, "Args:", [arg1, arg2]);
+        // console.log("Found Command:", cmdType, "Args:", [arg1, arg2]);
         // Remove the command tag from the visible text for the user
         cleanText = cleanText.replace(fullMatch, "");
     }
@@ -204,11 +293,11 @@ async function processAIResponse(responseText) {
 
     // 3. Execute identified commands
     for (const cmd of commandsToExecute) {
-        console.log("Executing structured command:", cmd.type, cmd.arg1, cmd.arg2);
+        // console.log("Executing structured command:", cmd.type, cmd.arg1, cmd.arg2);
         const result = await executeAppAction(cmd.type, cmd.arg1, cmd.arg2);
         // We don't necessarily need to tell the user the internal success, 
         // but we could show a small toast or log it.
-        console.log("Action result:", result);
+        // console.log("Action result:", result);
     }
 }
 
@@ -234,8 +323,18 @@ async function executeAppAction(type, arg1, arg2) {
             const taskText = arg2;
 
             if (window.createTask) {
+                // Check if list exists, if not create it first
+                // Format the date nicely for the list name (e.g. "Monday, January 10, 2025")
+                const dateObj = new Date(dateStr);
+                const dateName = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+                // We'll rely on createDateList's internal check to avoid overwriting
+                if (window.createDateList) {
+                    await window.createDateList(dateStr, dateName);
+                }
+
                 await window.createTask(taskText, dateStr, null, "", 1001);
-                return `Added task "${taskText}"`;
+                return `Added task "${taskText}" to ${dateName}`;
             }
         }
         return "Unknown or unavailable action";
@@ -248,7 +347,13 @@ async function executeAppAction(type, arg1, arg2) {
 
 // --- UI Helpers ---
 
-function addMessageToUI(sender, text) {
+/**
+ * Add a message bubble to the chat container.
+ * @param {'user'|'assistant'|'system'} sender 
+ * @param {string} text 
+ * @param {Blob[]} images - Optional images to display
+ */
+function addMessageToUI(sender, text, images = []) {
     const msgDiv = document.createElement("div");
     msgDiv.classList.add("ai-message");
 
@@ -256,7 +361,26 @@ function addMessageToUI(sender, text) {
     else if (sender === "assistant") msgDiv.classList.add("assistant-message");
     else msgDiv.classList.add("system-message");
 
-    msgDiv.innerHTML = text.replace(/\n/g, "<br>");
+    if (text) {
+        const textSpan = document.createElement("span");
+        textSpan.innerHTML = formatAIResponse(text);
+        msgDiv.appendChild(textSpan);
+    }
+
+    if (images && images.length > 0) {
+        const grid = document.createElement("div");
+        grid.className = "ai-image-grid";
+
+        images.forEach(blob => {
+            const img = document.createElement("img");
+            const reader = new FileReader();
+            reader.onload = (e) => img.src = e.target.result;
+            reader.readAsDataURL(blob);
+            grid.appendChild(img);
+        });
+
+        msgDiv.appendChild(grid);
+    }
 
     chatContainer.appendChild(msgDiv);
     scrollToBottom();
@@ -284,6 +408,21 @@ function removeTypingIndicator(id) {
 
 function scrollToBottom() {
     chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+/**
+ * Format AI response text with basic markdown and line breaks.
+ */
+function formatAIResponse(text) {
+    if (!text) return "";
+
+    // Bold: **text** -> <strong>text</strong>
+    let formatted = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+    // Line breaks
+    formatted = formatted.replace(/\n/g, "<br>");
+
+    return formatted;
 }
 
 // No auto-init footer, handled by main.js
