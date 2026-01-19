@@ -132,11 +132,21 @@ function initApp() {
 
     initAuth(onLogin, onLogout);
 }
+
+// Helper to show toaster
+async function showToaster() {
+    $('#saved-box-message').show();
+    setTimeout(() => {
+        $('#saved-box-message').hide();
+    }, 3000);
+}
 // Helper to save a single note
 function saveSingleNoteToDB(note) {
     const user = getCurrentUser();
     if (user) {
-        TodoService.saveNote(user.uid, note);
+        TodoService.saveNote(user.uid, note).then(() => {
+            showToaster();
+        });
     }
 }
 
@@ -294,7 +304,7 @@ function findPage(id) {
 
 //saving the html
 function saveText(pageID, pageHTML, pageName) {
-    let pageHTMLVal = $('#notes-detail-area').html();
+    let pageHTMLVal = replaceURLs($('#notes-detail-area').html());
     let tempArray = notesArray.map(function (el) {
         if (el.id === pageID) {
             let tempObj = {
@@ -315,14 +325,8 @@ function saveText(pageID, pageHTML, pageName) {
     if (updatedNote) {
         saveSingleNoteToDB(updatedNote);
     }
-
     createSections();
     notesArray = tempArray;
-    //show toaster on save
-    $('#saved-box-message').show();
-    setTimeout(() => {
-        $('#saved-box-message').hide();
-    }, 3000);
     if (pageName !== false) {
         let activeID = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
         createPageTabs(notesArray, activeID);

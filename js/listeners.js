@@ -84,13 +84,13 @@ $('#date-list-container, #task-detail-container').on('keydown', '#update-task-na
         let taskID = $(this).attr('taskid');
         updateTasks(dateID, taskID, tempTaskName, '', '');
         if ($(this).parent().hasClass('offcanvas-title')) {
-            $(this).parent().text(tempTaskName);
+            $(this).parent().html(replaceURLs(tempTaskName));
         }
         $(this).remove();
     }
     else if (e.keyCode == 27) {
         let prevValue = $(this).attr('prevvalue');
-        $(this).parent().text(prevValue);
+        $(this).parent().html(replaceURLs(prevValue));
         $(this).remove();
     }
 });

@@ -287,6 +287,7 @@ function renderTaskDetailHTML(el) {
             ${renderStatus(el.statusCode)}
          </select> */
 
+
 function renderStatus(el) {
     let tempHTML = '';
     for (let i = 1001; i < 1006; i++) {
@@ -354,7 +355,7 @@ async function createTask(taskName, dateID, el, desc, statusCode) {
 
     const newTask = {
         id: 'Task-' + dateID + "-" + milliseconds,
-        name: taskName,
+        name: replaceURLs(taskName),
         statusCode: statusCode ? statusCode : 1001,
         desc: desc ? desc : ''
     };
@@ -392,13 +393,17 @@ async function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails
     if (!user) return alert("Please login first");
 
     const updates = {};
-    if (taskName !== '') updates.name = taskName;
+    if (taskName !== '') updates.name = replaceURLs(taskName);
     if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
-    if (taskDetails === true) updates.desc = $('#task-notes-area').html();
+    if (taskDetails === true) updates.desc = replaceURLs($('#task-notes-area').html());
 
     try {
         await TodoService.updateTask(user.uid, dateID, taskID, updates);
         setMessageState('success', 'Task Updated Successfully!');
+        let newObj = findTask(dateID, taskID);
+        //update the task detail container with fresh HTML
+        $('#task-detail-container').empty();
+        $('#task-detail-container').append(renderTaskDetailHTML(newObj));
     } catch (e) {
         setMessageState('failure', 'Error updating task');
     }

@@ -135,7 +135,7 @@ function createButtons(array, color) {
     }
 }
 
-function createRTFToolbar(){
+function createRTFToolbar() {
     return `
         <div id="notes-formatter-row">
                 <div id="rtf-buttons">
