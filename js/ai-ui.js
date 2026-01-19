@@ -322,20 +322,18 @@ async function executeAppAction(type, arg1, arg2) {
             const dateStr = arg1;
             const taskText = arg2;
 
-            if (window.createTask) {
-                // Check if list exists, if not create it first
-                // Format the date nicely for the list name (e.g. "Monday, January 10, 2025")
-                const dateObj = new Date(dateStr);
-                const dateName = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            // Ensure dateStr (YYYY-MM-DD) is treated as local time
+            // By adding 'T00:00:00' we avoid the default behavior of parsing YYYY-MM-DD as UTC
+            const dateObj = new Date(dateStr + 'T00:00:00');
+            const dateName = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-                // We'll rely on createDateList's internal check to avoid overwriting
-                if (window.createDateList) {
-                    await window.createDateList(dateStr, dateName);
-                }
-
-                await window.createTask(taskText, dateStr, null, "", 1001);
-                return `Added task "${taskText}" to ${dateName}`;
+            // We'll rely on createDateList's internal check to avoid overwriting
+            if (window.createDateList) {
+                await window.createDateList(dateStr, dateName);
             }
+
+            await window.createTask(taskText, dateStr, null, "", 1001);
+            return `Added task "${taskText}" to ${dateName}`;
         }
         return "Unknown or unavailable action";
     } catch (e) {

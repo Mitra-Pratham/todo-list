@@ -50,11 +50,14 @@ export class AIService {
         }
 
         try {
-            const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            const todayISO = new Date().toISOString().split('T')[0];
-            const tomorrowDate = new Date();
-            tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-            const tomorrowISO = tomorrowDate.toISOString().split('T')[0];
+            // Use local date for everything to avoid UTC-mismatch discrepancies
+            const now = new Date();
+            const today = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            const todayISO = now.toLocaleDateString('en-CA'); // Gets YYYY-MM-DD in local time
+
+            const tomorrowDate = new Date(now);
+            tomorrowDate.setDate(now.getDate() + 1);
+            const tomorrowISO = tomorrowDate.toLocaleDateString('en-CA');
             const tomorrowName = tomorrowDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
 
@@ -64,7 +67,9 @@ export class AIService {
 
             const options = {
                 systemPrompt: `You are a helpful to-do list assistant.
-                Today's date is ${today} & today's ISO date is ${todayISO}.
+                Today's date is ${today}.
+                Current ISO date: ${todayISO}.
+                Tomorrow's date will be ${tomorrowName} (${tomorrowISO}).
                 
                 CRITICAL INSTRUCTION: If the user asks you to add a task or create a list, you MUST include a structured command tag at the very end of your response.
                 
@@ -72,7 +77,7 @@ export class AIService {
                 - {{CREATE_DATE_LIST: "YYYY-MM-DD", "Name of Date"}}
                 - {{ADD_TASK: "YYYY-MM-DD", "Task Description"}}
                 
-                You MUST use the exact YYYY-MM-DD format for dates. For "today", use "${todayISO}".
+                You MUST use the exact YYYY-MM-DD format for dates. For "today", use ${todayISO}. For "tomorrow", use ${tomorrowISO}.
                 Actions will ONLY happen if you include these tags.`,
 
                 initialPrompts: [
