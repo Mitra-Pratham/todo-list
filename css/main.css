@@ -144,7 +144,11 @@ body {
   z-index: 10000;
 }
 
-.btn:hover>.btn-title {
+.fc-event:hover {
+  z-index: 10001 !important;
+}
+
+.btn:hover>.btn-title, .fc-event:hover>.btn-title {
   display: block;
 }
 
@@ -780,7 +784,8 @@ code+div {
 }
 
 /* Filter Styles */
-.calendar-filters {
+.calendar-filters,
+.calendar-settings {
   background: var(--bs-white);
   border-radius: var(--card-radius);
   padding: 1rem;
@@ -933,6 +938,20 @@ code+div {
   .fc-event-title{
     color: var(--bs-gray-600) !important;
   }
+}
+
+.fc-event-google {
+  background-color: var(--bs-orange) !important;
+  border-color: var(--bs-orange) !important;
+  .fc-event-title {
+    color: var(--bs-white) !important;
+  }
+}
+.fc-event-time{
+  color: var(--bs-light) !important;
+}
+.fc-daygrid-event-dot{
+  border-color: rgba(var(--bs-light-rgb), 0.25) !important;
 }
 
 .fc .fc-daygrid-more-link {
