@@ -121,7 +121,13 @@ function renderDateList(data) {
                     <div class="d-flex align-items-start">
                         <div class="d-grid">
                             <h4 class="mb-1">${el.name}</h4>
-                            <p class="tasks-summary">${renderTaskListCount(el.taskList)} tasks completed out of ${el.taskList.length}</p>
+                            <div class="d-flex align-items-center mb-2">
+                                <p class="tasks-summary mb-0">${renderTaskListCount(el.taskList)} tasks completed out of ${el.taskList.length}</p>
+                                <button type="button" class="btn btn-sm btn-no-bg-gray ms-1 mark-all-done-btn" value="${el.id}">
+                                    <i class="fa-${renderTaskListCount(el.taskList) === el.taskList.length && el.taskList.length > 0 ? 'solid fa-check text-primary' : 'solid fa-check'}"></i>
+                                    <span class="btn-title">Mark All As Complete</span>
+                                </button>
+                            </div>
                         </div>
                         <button type="button" class="btn btn-sm btn-no-bg-gray ms-2 todo-date-delete" value="${el.id}">
                             <i class="fa-solid fa-trash"></i>
@@ -523,3 +529,21 @@ async function doneSelectedList() {
     }
     console.log('Loop finished')
 }
+
+// function to mark all tasks in a date list as done
+async function markAllAsDone(dateId) {
+    const dateList = taskArray.find(d => d.id === dateId);
+    if (!dateList) return;
+    
+    for (const task of dateList.taskList) {
+        if (task.statusCode !== 1004) {
+            try {
+                await updateTasks(dateId, task.id.slice(16), '', 1004, '');
+            } catch (error) {
+                console.error('Error marking task as done:', error);
+            }
+        }
+    }
+}
+
+window.markAllAsDone = markAllAsDone;

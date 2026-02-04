@@ -22,6 +22,12 @@ $('#date-list-container').on('click', '.todo-date-delete', function () {
     deleteDateList(dateID);
 });
 
+//event listener to mark all tasks as done
+$('#date-list-container').on('click', '.mark-all-done-btn', function () {
+    let dateID = $(this).val();
+    markAllAsDone(dateID);
+});
+
 //+ button event listener to create the task item
 // $('#date-list-container').on('click', '.todo-task-submit', function () {
 //     let taskName = $(this).prev().children('.create-task-input').val().trim();

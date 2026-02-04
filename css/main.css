@@ -940,13 +940,6 @@ code+div {
   }
 }
 
-.fc-event-google {
-  background-color: var(--bs-orange) !important;
-  border-color: var(--bs-orange) !important;
-  .fc-event-title {
-    color: var(--bs-white) !important;
-  }
-}
 .fc-event-time{
   color: var(--bs-light) !important;
 }
