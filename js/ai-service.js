@@ -2,6 +2,18 @@
 export class AIService {
     constructor() {
         this.session = null;
+        this.#sessionDate = null;
+    }
+
+    #sessionDate;
+
+    /**
+     * Resolve the Chrome AI LanguageModel API entry point.
+     * @returns {{ languageModel: object } | null}
+     */
+    #getAI() {
+        return window.ai
+            ?? (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
     }
 
     /**
@@ -9,9 +21,9 @@ export class AIService {
      * @returns {Promise<string>} - 'no', 'readily', or 'after-download'
      */
     async checkAvailability() {
-        const ai = window.ai || (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
+        const ai = this.#getAI();
 
-        if (!ai || !ai.languageModel) {
+        if (!ai?.languageModel) {
             return 'no';
         }
 
@@ -43,9 +55,9 @@ export class AIService {
     async initSession(onProgress) {
         if (this.session) return;
 
-        const ai = window.ai || (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
+        const ai = this.#getAI();
 
-        if (!ai || !ai.languageModel) {
+        if (!ai?.languageModel) {
             throw new Error("Chrome AI API not found.");
         }
 
@@ -60,47 +72,31 @@ export class AIService {
             const tomorrowISO = tomorrowDate.toLocaleDateString('en-CA');
             const tomorrowName = tomorrowDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-
-            // Dummy 1x1 pixel image for few-shot examples
-            const dummyImageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
-            const dummyBlob = await (await fetch(`data:image/png;base64,${dummyImageBase64}`)).blob();
-
             const options = {
                 systemPrompt: `You are a helpful to-do list assistant.
-                Today's date is ${today}.
-                Current ISO date: ${todayISO}.
-                Tomorrow's date will be ${tomorrowName} (${tomorrowISO}).
-                
-                CRITICAL INSTRUCTION: If the user asks you to add a task or create a list, you MUST include a structured command tag at the very end of your response.
-                
-                The tags are:
-                - {{CREATE_DATE_LIST: "YYYY-MM-DD", "Name of Date"}}
-                - {{ADD_TASK: "YYYY-MM-DD", "Task Description"}}
-                
-                You MUST use the exact YYYY-MM-DD format for dates. For "today", use ${todayISO}. For "tomorrow", use ${tomorrowISO}.
-                Actions will ONLY happen if you include these tags.`,
+Today: ${today} (${todayISO}). Tomorrow: ${tomorrowName} (${tomorrowISO}).
+
+You MUST include command tags at the end of your response when the user asks to manage tasks.
+Always use YYYY-MM-DD dates. For "today" use ${todayISO}, for "tomorrow" use ${tomorrowISO}.
+
+Available commands:
+{{CREATE_DATE_LIST: "YYYY-MM-DD", "Name of Date"}}
+{{ADD_TASK: "YYYY-MM-DD", "Task Description"}}
+{{UPDATE_TASK: "YYYY-MM-DD", "Old Task Name", "New Task Name"}}
+{{MARK_DONE: "YYYY-MM-DD", "Task Name"}}
+{{MARK_ALL_DONE: "YYYY-MM-DD"}}
+{{MOVE_DATE_LIST: "SOURCE-YYYY-MM-DD", "TARGET-YYYY-MM-DD"}}
+
+MOVE_DATE_LIST copies all tasks from the source date to the target date, then removes the source list.
+You can use multiple tags in one response. If a user sends an image, extract tasks from it and use ADD_TASK tags.
+Actions ONLY happen if you include these tags.`,
 
                 initialPrompts: [
-                    { role: 'user', content: [{ type: 'text', value: 'Add a task to buy eggs today' }] },
-                    { role: 'assistant', content: [{ type: 'text', value: `I've added "buy eggs" to your tasks for today. {{ADD_TASK: "${todayISO}", "buy eggs"}}` }] },
-                    { role: 'user', content: [{ type: 'text', value: 'Create a list for January 25 for "Project Launch"' }] },
-                    { role: 'assistant', content: [{ type: 'text', value: `I've created a new date list for January 25th. {{CREATE_DATE_LIST: "2026-01-25", "Sunday, January 25, 2026"}}` }] },
-                    { role: 'user', content: [{ type: 'text', value: 'Create a list for tomorrow for "Project Launch"' }] },
-                    { role: 'assistant', content: [{ type: 'text', value: `I've created a new date list for tomorrow. {{CREATE_DATE_LIST: "${tomorrowISO}", "${tomorrowName}"}}` }] },
-                    { role: 'user', content: [{ type: 'text', value: 'Add "Prepare slides" to the January 25th list' }] },
-                    { role: 'assistant', content: [{ type: 'text', value: `Added "Prepare slides" to your list for January 25th. {{ADD_TASK: "2026-01-25", "Prepare slides"}}` }] },
-                    { role: 'user', content: [{ type: 'text', value: 'Add tasks to buy milk, walk dog, and read book today' }] },
-                    { role: 'assistant', content: [{ type: 'text', value: `I've added those items to your list. {{ADD_TASK: "${todayISO}", "buy milk"}} {{ADD_TASK: "${todayISO}", "walk dog"}} {{ADD_TASK: "${todayISO}", "read book"}}` }] },
-                    { role: 'user', content: [{ type: 'text', value: 'Extract tasks from this image for today' }, { type: 'image', value: dummyBlob }] },
-                    { role: 'assistant', content: [{ type: 'text', value: `I see a list of items. I'll add them for you. {{ADD_TASK: "${todayISO}", "Buy groceries"}} {{ADD_TASK: "${todayISO}", "Call mom"}} {{ADD_TASK: "${todayISO}", "Schedule dentist"}}` }] }
-                ],
-                expectedInputs: [
-                    { type: "text", languages: ["en"] },
-                    // { type: "audio" },
-                    { type: "image" },
-                ],
-                expectedOutputs: [{ type: "text", languages: ["en"] }]
-
+                    { role: 'user', content: 'Add a task to buy eggs today and create a list for tomorrow' },
+                    { role: 'assistant', content: `Done! {{ADD_TASK: "${todayISO}", "buy eggs"}} {{CREATE_DATE_LIST: "${tomorrowISO}", "${tomorrowName}"}}` },
+                    { role: 'user', content: 'Move today\'s tasks to tomorrow' },
+                    { role: 'assistant', content: `Moved all tasks from today to tomorrow. {{MOVE_DATE_LIST: "${todayISO}", "${tomorrowISO}"}}` }
+                ]
             };
 
             if (onProgress) {
@@ -112,6 +108,7 @@ export class AIService {
             }
 
             this.session = await ai.languageModel.create(options);
+            this.#sessionDate = todayISO;
         } catch (error) {
             console.error("Failed to create Chrome AI session:", error);
             throw error;
@@ -119,46 +116,63 @@ export class AIService {
     }
 
     /**
-     * Chat with the AI.
+     * Stream a chat response from the AI, invoking onChunk with each partial result.
      * @param {string} userMessage - The latest user message
      * @param {Blob[]} images - Optional array of image Blobs
+     * @param {(chunk: string) => void} onChunk - Called with the cumulative text so far
+     * @returns {Promise<string>} The complete response text
      */
-    async chat(userMessage, images = [], isRetry = false) {
+    async chatStream(userMessage, images = [], onChunk = null, isRetry = false) {
+        // Auto-recreate session if the date has changed (avoids stale "today" in system prompt)
+        const currentDate = new Date().toLocaleDateString('en-CA');
+        if (this.session && this.#sessionDate !== currentDate) {
+            console.info("Date changed since session creation, refreshing session...");
+            this.session.destroy();
+            this.session = null;
+        }
+
         if (!this.session) {
             await this.initSession();
         }
 
         try {
-            const content = [];
+            // Build the prompt input — pass content directly, not wrapped in [{role, content}]
+            let promptInput;
 
-            // Add images if any
-            if (images && images.length > 0) {
-                for (const blob of images) {
-                    content.push({ type: 'image', value: blob });
+            if (images?.length > 0) {
+                const content = images.map(blob => ({ type: 'image', value: blob }));
+                if (userMessage) {
+                    content.push({ type: 'text', value: userMessage });
                 }
+                promptInput = content;
+            } else {
+                promptInput = userMessage;
             }
 
-            // Add text part
-            if (userMessage) {
-                content.push({ type: 'text', value: userMessage });
+            // Try streaming first, fall back to non-streaming prompt on failure
+            try {
+                const stream = this.session.promptStreaming(promptInput);
+                let fullText = '';
+
+                for await (const chunk of stream) {
+                    fullText += chunk;
+                    onChunk?.(fullText);
+                }
+
+                return fullText;
+            } catch (streamError) {
+                console.warn("promptStreaming failed, falling back to prompt():", streamError.message);
+                const result = await this.session.prompt(promptInput);
+                const responseText = typeof result === 'string' ? result : (result?.response ?? JSON.stringify(result));
+                onChunk?.(responseText);
+                return responseText;
             }
-
-            // Always use the explicit structure for consistency in multimodal sessions
-            const result = await this.session.prompt([{
-                role: 'user',
-                content: content
-            }]);
-
-            // Handle different potential return types from Prompt API
-            const responseText = typeof result === 'string' ? result : (result.response || JSON.stringify(result));
-            return responseText;
         } catch (error) {
             // Check for session destruction error and retry once
-            if (!isRetry && (error.name === 'InvalidStateError' || error.message.includes('destroyed'))) {
+            if (!isRetry && (error.name === 'InvalidStateError' || error.message?.includes('destroyed'))) {
                 console.warn("Session expired or destroyed. Re-initializing and retrying...");
                 this.session = null;
-                // Recursive retry with isRetry = true
-                return this.chat(userMessage, images, true);
+                return this.chatStream(userMessage, images, onChunk, true);
             }
 
             console.error("Chrome AI Prompt Error:", error);
@@ -176,6 +190,3 @@ export class AIService {
         }
     }
 }
-
-// Exporting dummy TOOLS for architecture consistency, though we use structured prompting here
-export const TOOLS_DEFINITION = [];

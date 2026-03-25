@@ -40,8 +40,8 @@ async function getDetailedDiagnostics() {
     };
 
     try {
-        const ai = window.ai || (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
-        if (ai && ai.languageModel) {
+        const ai = window.ai ?? (typeof LanguageModel !== 'undefined' ? { languageModel: LanguageModel } : null);
+        if (ai?.languageModel) {
             if (typeof ai.languageModel.capabilities === 'function') {
                 report.capabilities = await ai.languageModel.capabilities();
             }
@@ -113,10 +113,11 @@ export async function initAIUI() {
 
     if (inputField) {
         inputField.onpaste = (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const items = (e.clipboardData ?? e.originalEvent?.clipboardData)?.items;
+            if (!items) return;
             const files = [];
             for (const item of items) {
-                if (item.type.indexOf("image") !== -1) {
+                if (item.type.startsWith("image")) {
                     files.push(item.getAsFile());
                 }
             }
@@ -182,14 +183,13 @@ export async function initAIUI() {
 
 // --- Image Handling Helpers ---
 
-async function handleImageFiles(files) {
+function handleImageFiles(files) {
     for (const file of files) {
         if (pendingImages.length >= 5) {
             alert("Maximum 5 images allowed per message.");
             break;
         }
-        const referenceImage = new Blob([file], { type: file.type });
-        pendingImages.push(referenceImage);
+        pendingImages.push(file);
         renderImagePreview(file);
     }
     // Clear input so same file can be selected again
@@ -197,32 +197,83 @@ async function handleImageFiles(files) {
 }
 
 function renderImagePreview(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const div = document.createElement("div");
-        div.className = "ai-preview-item";
-        div.innerHTML = `
-            <img src="${e.target.result}" alt="Preview">
-            <button class="ai-preview-remove" title="Remove">&times;</button>
-        `;
+    const objectUrl = URL.createObjectURL(file);
+    const div = document.createElement("div");
+    div.className = "ai-preview-item";
+    div.innerHTML = `
+        <img src="${objectUrl}" alt="Preview">
+        <button class="ai-preview-remove" title="Remove">&times;</button>
+    `;
 
-        div.querySelector(".ai-preview-remove").onclick = () => {
-            const index = pendingImages.indexOf(file);
-            if (index > -1) pendingImages.splice(index, 1);
-            div.remove();
-        };
-
-        imagePreviews.appendChild(div);
+    div.querySelector(".ai-preview-remove").onclick = () => {
+        const index = pendingImages.indexOf(file);
+        if (index > -1) pendingImages.splice(index, 1);
+        URL.revokeObjectURL(objectUrl);
+        div.remove();
     };
-    reader.readAsDataURL(file);
+
+    imagePreviews.appendChild(div);
 }
 
 function clearPendingImages() {
     pendingImages = [];
-    if (imagePreviews) imagePreviews.innerHTML = "";
+    if (imagePreviews) {
+        imagePreviews.querySelectorAll("img").forEach(img => {
+            if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+        });
+        imagePreviews.innerHTML = "";
+    }
+}
+
+// --- Sanitization Helpers ---
+
+/**
+ * Escape HTML entities to prevent XSS when inserting into innerHTML.
+ */
+function sanitizeHTML(str) {
+    if (!str) return "";
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+/**
+ * Strip dangerous characters from AI-generated task names before passing to app functions.
+ */
+function sanitizeTaskInput(str) {
+    if (!str) return "";
+    return str.replace(/[<>"]/g, "");
 }
 
 // --- Chat Logic ---
+
+/**
+ * Create an empty assistant message bubble for streaming text into.
+ */
+function createAssistantBubble() {
+    const msgDiv = document.createElement("div");
+    msgDiv.classList.add("ai-message", "assistant-message");
+
+    // Typing indicator shown until first chunk arrives
+    const typingDiv = document.createElement("div");
+    typingDiv.className = "typing-indicator";
+    typingDiv.innerHTML = `
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+    `;
+    msgDiv.appendChild(typingDiv);
+
+    const textSpan = document.createElement("span");
+    textSpan.classList.add("d-none");
+    msgDiv.appendChild(textSpan);
+
+    chatContainer.appendChild(msgDiv);
+    scrollToBottom();
+    return { msgDiv, textSpan, typingDiv };
+}
 
 async function handleSendMessage() {
     if (!isAIReady) {
@@ -242,68 +293,80 @@ async function handleSendMessage() {
     // 1. Add User Message to UI
     addMessageToUI("user", text, imagesToSend);
 
-    // 2. Show Typing Indicator
-    const typingId = showTypingIndicator();
+    // 2. Create assistant bubble for streaming (shows typing dots)
+    const { msgDiv, textSpan, typingDiv } = createAssistantBubble();
 
     try {
-        // 3. Call AI Service with multimodal input
-        const response = await aiService.chat(text, imagesToSend);
+        // 3. Stream AI response into the bubble
+        const fullResponse = await aiService.chatStream(text, imagesToSend, (chunk) => {
+            // Swap typing indicator for text on first chunk
+            if (!typingDiv.classList.contains("d-none")) {
+                typingDiv.classList.add("d-none");
+                textSpan.classList.remove("d-none");
+            }
+            textSpan.innerHTML = formatAIResponse(chunk);
+            scrollToBottom();
+        });
 
-        removeTypingIndicator(typingId);
-
-        if (!response) {
+        if (!fullResponse) {
             throw new Error("No response from Chrome AI");
         }
 
-        // 4. Process Response and Parse Commands
-        processAIResponse(response);
+        // 4. Process final response — strip commands from display and execute them
+        await processAIResponse(fullResponse, textSpan);
 
     } catch (error) {
-        removeTypingIndicator(typingId);
-        addMessageToUI("system", "Error: " + error.message);
+        typingDiv.classList.add("d-none");
+        textSpan.classList.remove("d-none");
+        textSpan.innerHTML = formatAIResponse("Error: " + error.message);
+        msgDiv.classList.remove("assistant-message");
+        msgDiv.classList.add("system-message");
         console.error(error);
     }
 }
 
-async function processAIResponse(responseText) {
-    // const responseText = response; // Removed this incorrect line
+async function processAIResponse(responseText, textSpan) {
+    // Regex patterns for all command types
+    const cmd3Args = /\{\{(UPDATE_TASK):\s*"([^"]+)",\s*"([^"]+)",\s*"([^"]+)"\}\}/g;
+    const cmd2Args = /\{\{(CREATE_DATE_LIST|ADD_TASK|MARK_DONE|MOVE_DATE_LIST):\s*"([^"]+)",\s*"([^"]+)"\}\}/g;
+    const cmd1Arg = /\{\{(MARK_ALL_DONE):\s*"([^"]+)"\}\}/g;
 
-    // 1. Extract commands from response
-    // Commands are in format {{COMMAND: "arg1", "arg2"}}
-    const commandRegex = /\{\{(CREATE_DATE_LIST|ADD_TASK):\s*"([^"]+)",\s*"([^"]+)"\}\}/g;
-
-    let cleanText = responseText;
-    let match;
     const commandsToExecute = [];
 
-    while ((match = commandRegex.exec(responseText)) !== null) {
-        const [fullMatch, cmdType, arg1, arg2] = match;
+    // Extract 3-arg commands (UPDATE_TASK)
+    for (const [, cmdType, arg1, arg2, arg3] of responseText.matchAll(cmd3Args)) {
+        commandsToExecute.push({ type: cmdType, arg1, arg2, arg3 });
+    }
+
+    // Extract 2-arg commands (CREATE_DATE_LIST, ADD_TASK, MARK_DONE)
+    for (const [, cmdType, arg1, arg2] of responseText.matchAll(cmd2Args)) {
         commandsToExecute.push({ type: cmdType, arg1, arg2 });
-        // console.log("Found Command:", cmdType, "Args:", [arg1, arg2]);
-        // Remove the command tag from the visible text for the user
-        cleanText = cleanText.replace(fullMatch, "");
     }
 
-    if (commandsToExecute.length === 0) {
-        console.warn("No structured commands found in AI response.");
+    // Extract 1-arg commands (MARK_ALL_DONE)
+    for (const [, cmdType, arg1] of responseText.matchAll(cmd1Arg)) {
+        commandsToExecute.push({ type: cmdType, arg1 });
     }
 
-    // 2. Add message to UI (cleaned of command tags)
-    addMessageToUI("assistant", cleanText.trim());
+    // Strip all command tags from display text in one pass
+    const allCmdRegex = /\{\{(?:CREATE_DATE_LIST|ADD_TASK|UPDATE_TASK|MARK_DONE|MARK_ALL_DONE|MOVE_DATE_LIST):[^}]*\}\}/g;
+    const cleanText = responseText.replace(allCmdRegex, "").trim();
 
-    // 3. Execute identified commands
+    // Update the displayed message with cleaned text
+    if (textSpan) {
+        textSpan.innerHTML = formatAIResponse(cleanText);
+    }
+
+    // Execute commands — batch-deduplicate createDateList calls per response
+    const ensuredDates = new Set();
     for (const cmd of commandsToExecute) {
-        // console.log("Executing structured command:", cmd.type, cmd.arg1, cmd.arg2);
-        const result = await executeAppAction(cmd.type, cmd.arg1, cmd.arg2);
-        // We don't necessarily need to tell the user the internal success, 
-        // but we could show a small toast or log it.
-        // console.log("Action result:", result);
+        await executeAppAction(cmd.type, cmd.arg1, cmd.arg2, cmd.arg3, ensuredDates);
     }
 }
 
-// --- App Actions (Parsing Fallback for Tool Calling) ---
+// --- App Actions ---
 
-async function executeAppAction(type, arg1, arg2) {
+async function executeAppAction(type, arg1, arg2, arg3, ensuredDates) {
     const user = getCurrentUser();
     if (!user) {
         addMessageToUI("system", "Please log in to perform actions.");
@@ -313,27 +376,83 @@ async function executeAppAction(type, arg1, arg2) {
     try {
         if (type === "CREATE_DATE_LIST") {
             const dateStr = arg1;
-            const dateName = arg2;
+            const dateName = sanitizeTaskInput(arg2);
             if (window.createDateList) {
                 await window.createDateList(dateStr, dateName);
+                ensuredDates?.add(dateStr);
                 return `Created list for ${dateName}`;
             }
         } else if (type === "ADD_TASK") {
             const dateStr = arg1;
-            const taskText = arg2;
+            const taskText = sanitizeTaskInput(arg2);
 
             // Ensure dateStr (YYYY-MM-DD) is treated as local time
-            // By adding 'T00:00:00' we avoid the default behavior of parsing YYYY-MM-DD as UTC
             const dateObj = new Date(dateStr + 'T00:00:00');
             const dateName = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-            // We'll rely on createDateList's internal check to avoid overwriting
-            if (window.createDateList) {
+            // Batch-deduplicate: only ensure date list once per response
+            if (window.createDateList && !ensuredDates?.has(dateStr)) {
                 await window.createDateList(dateStr, dateName);
+                ensuredDates?.add(dateStr);
             }
 
             await window.createTask(taskText, dateStr, null, "", 1001);
             return `Added task "${taskText}" to ${dateName}`;
+        } else if (type === "UPDATE_TASK") {
+            const dateStr = arg1;
+            const oldName = arg2;
+            const newName = sanitizeTaskInput(arg3);
+
+            const taskInfo = window.findTaskByName?.(dateStr, oldName);
+            if (taskInfo) {
+                await window.updateTasks(taskInfo.dateID, taskInfo.taskID, newName, '', '');
+                return `Renamed "${oldName}" to "${newName}"`;
+            }
+            return `Task "${oldName}" not found on ${dateStr}`;
+        } else if (type === "MARK_DONE") {
+            const dateStr = arg1;
+            const taskName = arg2;
+
+            const taskInfo = window.findTaskByName?.(dateStr, taskName);
+            if (taskInfo) {
+                await window.updateTasks(taskInfo.dateID, taskInfo.taskID, '', 1004, '');
+                return `Marked "${taskName}" as done`;
+            }
+            return `Task "${taskName}" not found on ${dateStr}`;
+        } else if (type === "MARK_ALL_DONE") {
+            const dateStr = arg1;
+            if (window.markAllAsDone) {
+                await window.markAllAsDone(dateStr);
+                return `Marked all tasks on ${dateStr} as done`;
+            }
+        } else if (type === "MOVE_DATE_LIST") {
+            const sourceDate = arg1;
+            const targetDate = arg2;
+
+            // Look up source tasks from the global taskArray
+            const sourceDateList = window.taskArray?.find(d => d.id === sourceDate);
+            if (!sourceDateList?.taskList?.length) {
+                return `No tasks found on ${sourceDate} to move`;
+            }
+
+            // Ensure target date list exists
+            const targetObj = new Date(targetDate + 'T00:00:00');
+            const targetName = targetObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            if (window.createDateList) {
+                await window.createDateList(targetDate, targetName);
+            }
+
+            // Copy each task to the target date
+            for (const task of sourceDateList.taskList) {
+                await window.createTask(task.name, targetDate, null, task.desc || "", task.statusCode || 1001);
+            }
+
+            // Delete the source date list
+            if (window.deleteDateList) {
+                await window.deleteDateList(sourceDate);
+            }
+
+            return `Moved ${sourceDateList.taskList.length} tasks from ${sourceDate} to ${targetDate}`;
         }
         return "Unknown or unavailable action";
     } catch (e) {
@@ -361,21 +480,20 @@ function addMessageToUI(sender, text, images = []) {
 
     if (text) {
         const textSpan = document.createElement("span");
-        textSpan.innerHTML = formatAIResponse(text);
+        // System messages contain trusted HTML; user/assistant text is sanitized via formatAIResponse
+        textSpan.innerHTML = sender === "system" ? text : formatAIResponse(text);
         msgDiv.appendChild(textSpan);
     }
 
-    if (images && images.length > 0) {
+    if (images?.length > 0) {
         const grid = document.createElement("div");
         grid.className = "ai-image-grid";
 
-        images.forEach(blob => {
+        for (const blob of images) {
             const img = document.createElement("img");
-            const reader = new FileReader();
-            reader.onload = (e) => img.src = e.target.result;
-            reader.readAsDataURL(blob);
+            img.src = URL.createObjectURL(blob);
             grid.appendChild(img);
-        });
+        }
 
         msgDiv.appendChild(grid);
     }
@@ -384,38 +502,22 @@ function addMessageToUI(sender, text, images = []) {
     scrollToBottom();
 }
 
-function showTypingIndicator() {
-    const id = "typing-" + Date.now();
-    const div = document.createElement("div");
-    div.id = id;
-    div.className = "typing-indicator ms-2 mb-3";
-    div.innerHTML = `
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-    `;
-    chatContainer.appendChild(div);
-    scrollToBottom();
-    return id;
-}
-
-function removeTypingIndicator(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-}
-
 function scrollToBottom() {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 /**
  * Format AI response text with basic markdown and line breaks.
+ * Escapes HTML entities first to prevent XSS.
  */
 function formatAIResponse(text) {
     if (!text) return "";
 
+    // Escape HTML entities first
+    let formatted = sanitizeHTML(text);
+
     // Bold: **text** -> <strong>text</strong>
-    let formatted = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
     // Line breaks
     formatted = formatted.replace(/\n/g, "<br>");

@@ -111,6 +111,7 @@ async function createUpdateDateList(data, messageType, messageText) {
 function renderDateList(data) {
 
     taskArray = bubbleSort(data).reverse();
+    window.taskArray = taskArray;
 
 
     $('#date-list-container').empty();
@@ -415,6 +416,7 @@ async function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails
     }
 }
 
+//find task using IDs
 function findTask(dateID, taskID) {
     let tempTask = '';
     let tempDateName = '';
@@ -547,3 +549,16 @@ async function markAllAsDone(dateId) {
 }
 
 window.markAllAsDone = markAllAsDone;
+
+// Find a task by name within a date list (case-insensitive) — used by AI commands
+window.findTaskByName = function (dateId, taskName) {
+    const dateList = taskArray.find(d => d.id === dateId);
+    if (!dateList) return null;
+
+    const task = dateList.taskList.find(t =>
+        t.name.localeCompare(taskName, undefined, { sensitivity: 'base' }) === 0
+    );
+
+    if (!task) return null;
+    return { dateID: dateId, taskID: task.id.slice(16) };
+};
