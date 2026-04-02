@@ -14,7 +14,6 @@
         integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/ai.css">
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -53,10 +52,6 @@
                 <div class="navbar-nav align-items-center">
                     <button id="calendar-toggle-btn" class="nav-link me-2" type="button">
                         <i class="fa-solid fa-calendar-days me-2"></i>Calendar
-                    </button>
-                    <button id="ai-toggle-btn" class="nav-link me-2" type="button" data-bs-toggle="offcanvas"
-                        data-bs-target="#ai-sidebar" aria-controls="ai-sidebar">
-                        <i class="fa-solid fa-wand-magic-sparkles me-2"></i>Chrome AI
                     </button>
                     <a class="nav-link nav-active" href="index.html">To-Do List</a>
                     <a class="nav-link ms-2" href="notes.html">Notes</a>
@@ -118,65 +113,6 @@
     </div>
 
 
-    <!-- AI Sidebar -->
-    <div class="offcanvas offcanvas-end" data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="ai-sidebar"
-        aria-labelledby="aiSidebarLabel">
-        <div class="offcanvas-header align-items-center justify-content-between border-bottom">
-            <h5 class="offcanvas-title" id="aiSidebarLabel"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Chrome
-                AI
-                Assistant</h5>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-lite-sm-2x btn-no-bg-gray btn-lh-0 ms-2" id="ai-reset-btn">
-                    <i class="fa-solid fa-rotate m-0"></i>
-                    <span class="btn-title">Reset Session</span>
-                </button>
-                <button type="button" class="btn btn-lite-sm-2x btn-no-bg-gray btn-lh-0 ms-2"
-                    data-bs-dismiss="offcanvas" aria-label="Close">
-                    <i class="fa-solid fa-xmark m-0"></i>
-                    <span class="btn-title">Close</span>
-                </button>
-            </div>
-        </div>
-        <div class="offcanvas-body d-flex flex-column p-0">
-            <!-- Chrome AI Status -->
-            <div id="ai-loading-status" class="p-3 border-bottom bg-light text-center">
-                <div id="ai-status-text" class="form-text small italic">Checking Chrome AI availability...</div>
-                <div class="progress mt-2 d-none" id="ai-progress-container" style="height: 10px;">
-                    <div id="ai-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
-                        role="progressbar" style="width: 0%"></div>
-                </div>
-                <div id="ai-init-btn-container" class="mt-2 d-none">
-                    <button id="ai-init-btn" class="btn btn-sm btn-primary">Download & Initialize AI</button>
-                </div>
-            </div>
-
-            <!-- Chat Area -->
-            <div id="ai-chat-messages" class="flex-grow-1 p-3 overflow-auto">
-                <div class="ai-message system-message text-muted small text-center mb-3">
-                    Hi! I'm your AI assistant. I can help you manage your tasks.
-                </div>
-                <!-- Messages will be injected here -->
-            </div>
-
-            <!-- Input Area -->
-            <div class="p-3 border-top">
-                <div id="ai-image-previews" class="d-flex flex-wrap gap-2 mb-2"></div>
-                <div class="input-group">
-                    <input type="file" id="ai-image-input" accept="image/*" multiple class="d-none">
-                    <button class="btn btn-lite-bg border rounded-start" type="button" id="ai-image-btn"
-                        title="Upload Image">
-                        <i class="fa-solid fa-image"></i>
-                    </button>
-                    <textarea class="form-control" id="ai-input" rows="1" placeholder="Type a message..."
-                        style="resize: none; field-sizing: content; overflow: hidden;"></textarea>
-                    <button class="btn btn-lite-bg border rounded-end" type="button" id="ai-send-btn">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="offcanvas offcanvas-end" data-bs-scroll="true" data-bs-backdrop="false" id="task-detail-container">
 
     </div>
@@ -210,7 +146,6 @@
 <script type="module" src="js/auth.js"></script>
 <script type="module" src="js/todo-service.js"></script>
 <script type="module" src="js/main.js"></script>
-<script type="module" src="js/ai-ui.js"></script>
 <script src="js/listeners.js"></script>
 <script src="js/drag.js"></script>
 <script src="js/calendar.js"></script>
