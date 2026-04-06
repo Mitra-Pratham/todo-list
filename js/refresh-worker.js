@@ -1,37 +1,40 @@
-const LAST_VISIT_KEY = 'last-visit-timestamp';
-const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+// ============================================================
+// refresh-worker.js — Auto-refresh the page after 24 h of inactivity
+// ============================================================
 
-// 1. Handle Initial Load & reset the page refresh key when auto-refreshed or manually refreshed
+/** localStorage key that stores the last-visit epoch timestamp */
+const LAST_VISIT_KEY = 'last-visit-timestamp';
+
+/** Threshold after which the page should reload (24 hours) */
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * On every page load: record the current timestamp and set today's date
+ * in the date-picker input so new date lists default to today.
+ */
 window.addEventListener('load', () => {
-        console.log('Page was refreshed. Resetting timestamp.');
-        localStorage.setItem(LAST_VISIT_KEY, new Date().getTime().toString());
-        let date = new Date();
-        let formattedDate = date.toISOString().split('T')[0];
-        $('#todo-date-input').val(formattedDate); 
-        if (!localStorage.getItem(LAST_VISIT_KEY)) {
-        console.log('First visit. Setting initial timestamp.');
-        localStorage.setItem(LAST_VISIT_KEY, new Date().getTime().toString());
-    }
+    const nowMs = Date.now().toString();
+    localStorage.setItem(LAST_VISIT_KEY, nowMs);
+
+    const todayISO = new Date().toISOString().split('T')[0];
+    $('#todo-date-input').val(todayISO);
 });
 
-// 2. Handle Page Visibility and Timestamps, refresh page when the days since visit is greater than 1 to update the date list & perform background clean-up.
+/**
+ * When the tab becomes visible again, check whether more than 24 hours
+ * have elapsed since the last visit. If so, reload the page to pick up
+ * fresh data and reset the date picker.
+ */
 function handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-        console.log('Tab is now visible. Checking timestamp.');
-        const lastVisit = localStorage.getItem(LAST_VISIT_KEY);
+    if (document.visibilityState !== 'visible') return;
 
-        const now = new Date().getTime();
+    const lastVisit = localStorage.getItem(LAST_VISIT_KEY);
+    if (!lastVisit) return;
 
-        if (lastVisit) {
-            const timeSinceLastVisit = now - parseInt(lastVisit, 10);
-            console.log(`Time since last visit: ${timeSinceLastVisit}ms`);
-            console.log(timeSinceLastVisit, ONE_DAY_IN_MS);
-            if (timeSinceLastVisit > ONE_DAY_IN_MS) {
-                console.log('Time is over 1 day. Refreshing page');
-                console.log('Executing refresh command.');
-                window.location.reload();
-            }
-        }
+    const elapsed = Date.now() - parseInt(lastVisit, 10);
+    if (elapsed > ONE_DAY_MS) {
+        console.info(`refresh-worker.js — ${Math.round(elapsed / 3600000)}h since last visit, reloading.`);
+        window.location.reload();
     }
 }
 

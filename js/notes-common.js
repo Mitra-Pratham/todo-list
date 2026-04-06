@@ -1,140 +1,86 @@
+// ============================================================
+// notes-common.js — Shared constants, sorting, and RTF toolbar
+// ============================================================
+
+/** Keyboard shortcut definitions shown in the RTF toolbar help panel */
 const shortcutKeys = [
-    {
-        name: `Cut`,
-        keys: `Ctrl + X`,
-    },
-    {
-        name: `Copy`,
-        keys: `Ctrl + C`,
-    },
-    {
-        name: `Paste`,
-        keys: `Ctrl + V`,
-    },
-    {
-        name: `Bold`,
-        keys: `Ctrl + B`,
-    },
-    {
-        name: `Italics`,
-        keys: `Ctrl + I`,
-    },
-    {
-        name: `Unordered List and Sub Bullets`,
-        keys: `Ctrl + Shift + 9`,
-    },
-    {
-        name: `Ordered List and Sub Bullets`,
-        keys: `Tab`,
-    },
-    {
-        name: `Convert selection text to links`,
-        keys: `Ctrl + K`,
-    },
-    {
-        name: `Convert selection to code block`,
-        keys: 'Ctrl + Shift + `',
-    },
-]
+    { name: 'Cut',                              keys: 'Ctrl + X' },
+    { name: 'Copy',                             keys: 'Ctrl + C' },
+    { name: 'Paste',                            keys: 'Ctrl + V' },
+    { name: 'Bold',                             keys: 'Ctrl + B' },
+    { name: 'Italics',                          keys: 'Ctrl + I' },
+    { name: 'Unordered List and Sub Bullets',   keys: 'Ctrl + Shift + 9' },
+    { name: 'Ordered List and Sub Bullets',     keys: 'Tab' },
+    { name: 'Convert selection text to links',  keys: 'Ctrl + K' },
+    { name: 'Convert selection to code block',  keys: 'Ctrl + Shift + `' },
+];
+
+/** Heading tag options for the RTF heading picker */
 const headingsArray = [
-    {
-        name: `Heading 1`,
-        value: `h1`,
-    },
-    {
-        name: `Heading 2`,
-        value: `h2`,
-    },
-    {
-        name: `Heading 3`,
-        value: `h3`,
-    },
-    {
-        name: `Heading 4`,
-        value: `h4`,
-    },
-    {
-        name: `Heading 5`,
-        value: `h5`,
-    },
-    {
-        name: `Heading 6`,
-        value: `h6`,
-    },
-    {
-        name: `Paragraph`,
-        value: `p`,
-    },
-]
+    { name: 'Heading 1', value: 'h1' },
+    { name: 'Heading 2', value: 'h2' },
+    { name: 'Heading 3', value: 'h3' },
+    { name: 'Heading 4', value: 'h4' },
+    { name: 'Heading 5', value: 'h5' },
+    { name: 'Heading 6', value: 'h6' },
+    { name: 'Paragraph',  value: 'p' },
+];
+
+/** Colour options for font and background pickers */
 const colorsArray = [
-    {
-        name: `Black`,
-        value: `black`,
-    },
-    {
-        name: `White`,
-        value: `white`,
-    },
-    {
-        name: `Red`,
-        value: `red`,
-    },
-    {
-        name: `Blue`,
-        value: `blue`,
-    },
-    {
-        name: `Green`,
-        value: `green`,
-    },
-    {
-        name: `Yellow`,
-        value: `yellow`,
-    },
-]
+    { name: 'Black',  value: 'black' },
+    { name: 'White',  value: 'white' },
+    { name: 'Red',    value: 'red' },
+    { name: 'Blue',   value: 'blue' },
+    { name: 'Green',  value: 'green' },
+    { name: 'Yellow', value: 'yellow' },
+];
 
+/** Reusable CSS class string for small toolbar buttons */
+const commonButtonClasses = 'btn btn-lite-sm btn-no-bg-gray';
 
-const commonButtonClasses = `btn btn-lite-sm btn-no-bg-gray`;
-
-//date sort in terms of ascending order
-function bubbleSort(arr) {
-    let n = arr.length;
-
-    // Traverse through all array elements
-    for (let i = 0; i < n - 1; i++) {
-        for (let j = 0; j < n - 1 - i; j++) {
-            // Swap if element is greater than next index
-            let prevDate = new Date(arr[j].id).getTime();
-            let newDate = new Date(arr[j + 1].id).getTime();
-            if (prevDate > newDate) {
-                [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
-            }
-        }
-    }
-
-    return arr;
+/**
+ * Sort an array of objects by their `.id` property (date string) in ascending order.
+ * Returns a new sorted array — does not mutate the original.
+ * Uses native Array.sort (O(n log n)) instead of the previous O(n²) bubble sort.
+ * @param {Array<{id: string}>} items - Array with date-string IDs (e.g. "2026-04-06")
+ * @returns {Array<{id: string}>} Sorted copy of the array
+ */
+function sortByDate(items) {
+    return [...items].sort((a, b) => new Date(a.id) - new Date(b.id));
 }
 
+/**
+ * Build HTML for the keyboard-shortcut help panel.
+ * @returns {string} HTML string of shortcut rows
+ */
 function createShortcuts() {
-    return (
-        shortcutKeys.map((el) => {
-            return `<div class="mb-1">${el.name}: <b>${el.keys}</b></div>`
-        }).join(""));
+    return shortcutKeys
+        .map((shortcut) => `<div class="mb-1">${shortcut.name}: <b>${shortcut.keys}</b></div>`)
+        .join('');
 }
 
+/**
+ * Build HTML for a list of toolbar buttons (headings, colours, etc.).
+ * @param {Array<{name: string, value: string}>} items - Button definitions
+ * @param {boolean} [showSwatch=false] - If true, render a colour swatch instead of text label
+ * @returns {string} HTML string of buttons
+ */
+function createButtons(items, showSwatch = false) {
+    const renderSwatch = (value) =>
+        `<div value="${value}" style="border:1px solid #ddd; border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`;
 
-function createButtons(array, color) {
-    return (
-        array.map((el) => {
-            return `<button class="btn btn-lite-sm btn-no-bg d-flex" value="${el.value}">
-                ${color ? colorAdd(el.value) : ''} ${color ? '' : el.name}<span class="btn-title">${el.name}</span></button>`
-        }).join(""));
-
-    function colorAdd(value) {
-        return `<div value=${value} style="border:1px solid #ddd; border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`
-    }
+    return items
+        .map((item) =>
+            `<button class="btn btn-lite-sm btn-no-bg d-flex" value="${item.value}">
+                ${showSwatch ? renderSwatch(item.value) : item.name}<span class="btn-title">${item.name}</span></button>`)
+        .join('');
 }
 
+/**
+ * Build the full Rich-Text-Formatting toolbar HTML used in task-detail and notes views.
+ * @returns {string} HTML string for the toolbar
+ */
 function createRTFToolbar() {
     return `
         <div id="notes-formatter-row">
@@ -152,9 +98,9 @@ function createRTFToolbar() {
                     <span class="btn-title">Ordered List - Ctrl + Shift + 9</span>
                     </button>
 
-                    <button class="${commonButtonClasses} ul-box"">
+                    <button class="${commonButtonClasses} ul-box">
                     <i class="fa-solid fa-list-ul"></i>
-                    <span class=" btn-title">Unordered List - Tab</span>
+                    <span class="btn-title">Unordered List - Tab</span>
                     </button>
 
                     <button class="${commonButtonClasses} colors-box">
@@ -167,7 +113,7 @@ function createRTFToolbar() {
 
                     <button class="${commonButtonClasses} background-box">
                     <i class="fa-solid fa-highlighter"></i>
-                     <span class="btn-title">BG Color</span>
+                    <span class="btn-title">BG Color</span>
                     </button>
                     <div id="background-box-container" class="task-box-ui-layout">
                         ${createButtons(colorsArray, true)}
@@ -184,5 +130,5 @@ function createRTFToolbar() {
                 </div>
                 <div id="saved-box-message" class="toaster-message">Your notes have been saved</div>
             </div>
-    `
+    `;
 }

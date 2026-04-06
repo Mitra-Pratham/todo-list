@@ -4,28 +4,28 @@
 $('#todo-date-input').val(new Date().toISOString().slice(0, 10));
 
 //+ button to create the date list
-$('#todo-date-submit').on('click', function () {
-    let inputDate = $('#todo-date-input').val();
-    let inputDateName = new Date(inputDate).toLocaleDateString('en-us', { weekday: "long", year: "numeric", month: "short", day: "numeric" });
+$('#todo-date-submit').on('click', () => {
+    const inputDate = $('#todo-date-input').val();
+    const inputDateName = new Date(inputDate).toLocaleDateString('en-us', { weekday: "long", year: "numeric", month: "short", day: "numeric" });
 
-    if (taskArray.some(e => e.id == inputDate) === false) {
+    const alreadyExists = taskArray.some((dateItem) => dateItem.id === inputDate);
+    if (!alreadyExists) {
         createDateList(inputDate, inputDateName);
-    }
-    else {
+    } else {
         setMessageState('failure', 'Date list already exists!');
     }
 });
 
 //event listener to delete date list
 $('#date-list-container').on('click', '.todo-date-delete', function () {
-    let dateID = $(this).val();
-    deleteDateList(dateID);
+    const dateId = $(this).val();
+    deleteDateList(dateId);
 });
 
 //event listener to mark all tasks as done
 $('#date-list-container').on('click', '.mark-all-done-btn', function () {
-    let dateID = $(this).val();
-    markAllAsDone(dateID);
+    const dateId = $(this).val();
+    markAllAsDone(dateId);
 });
 
 //+ button event listener to create the task item
@@ -37,66 +37,59 @@ $('#date-list-container').on('click', '.mark-all-done-btn', function () {
 
 //keydown 'enter' event listener to create the task item
 $('#date-list-container').on('keydown', '.create-task-input', function (e) {
-    let taskName = $(this).val().trim();
-    let dateID = $(this).attr('id').slice(11);
-    switch (e.keyCode) {
-        case 13:
-            {
-                createTask(taskName, dateID, this, '');
-
-            }
-        default:
-            break;
+    if (e.key === 'Enter') {
+        const taskName = $(this).val().trim();
+        const dateId = $(this).attr('id').slice(11);
+        createTask(taskName, dateId, this, '');
     }
 });
 
 //event listener to delete tasks from the delete button
 $('#date-list-container, #task-detail-container').on('click', '.todo-task-delete', function () {
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    deleteTasks(dateID, taskID);
+    const dateId = $(this).val().slice(5, 15);
+    const taskId = $(this).val().slice(16);
+    deleteTasks(dateId, taskId);
     bsOffcanvas.hide(); //hide detail view or close detail view
 
 });
 
 //event listener to create the input field for editing the tasks
 $('#date-list-container').on('click', '.todo-task-edit', function () {
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    let value = $(this).parent().siblings('.task-name-container').find('.task-name').text().trim();
+    const dateId = $(this).val().slice(5, 15);
+    const taskId = $(this).val().slice(16);
+    const currentName = $(this).parent().siblings('.task-name-container').find('.task-name').text().trim();
 
-    let updateTaskName = `<input id="update-task-name" class="w-75" type="text" prevValue='${value}' dateID='${dateID}' taskID='${taskID}' value='${value}'></input>`
+    const editInput = `<input id="update-task-name" class="w-75" type="text" prevValue='${currentName}' dateID='${dateId}' taskID='${taskId}' value='${currentName}'>`;
     $(this).parent().siblings('.task-name-container').find('.task-name').empty();
-    $(this).parent().siblings('.task-name-container').find('.task-name').append(updateTaskName);
+    $(this).parent().siblings('.task-name-container').find('.task-name').append(editInput);
     $('#update-task-name').focus();
 });
 
 //event listener to create the input field for editing the tasks in the detail view
 $('#task-detail-container').on('click', '.todo-task-edit', function () {
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    let value = $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').text().trim();
-    let updateTaskName = `<textarea id="update-task-name" class="w-100" type="text" prevValue='${value}' dateID='${dateID}' taskID='${taskID}' value='${value}'>${value}</textarea>`
+    const dateId = $(this).val().slice(5, 15);
+    const taskId = $(this).val().slice(16);
+    const currentName = $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').text().trim();
+    const editTextarea = `<textarea id="update-task-name" class="w-100" type="text" prevValue='${currentName}' dateID='${dateId}' taskID='${taskId}' value='${currentName}'>${currentName}</textarea>`;
     $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').empty();
-    $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').append(updateTaskName);
+    $(this).parent().siblings('.task-detail-title').find('.offcanvas-title').append(editTextarea);
     $('#update-task-name').focus();
 });
 
 //event listener to take the input from the input field tasks from the edit button
 $('#date-list-container, #task-detail-container').on('keydown', '#update-task-name', function (e) {
-    if (e.keyCode == 13) {
-        let tempTaskName = $(this).val().trim();
-        let dateID = $(this).attr('dateid');
-        let taskID = $(this).attr('taskid');
-        updateTasks(dateID, taskID, tempTaskName, '', '');
+    if (e.key === 'Enter') {
+        const newName = $(this).val().trim();
+        const dateId = $(this).attr('dateid');
+        const taskId = $(this).attr('taskid');
+        updateTasks(dateId, taskId, newName, '', '');
         if ($(this).parent().hasClass('offcanvas-title')) {
-            $(this).parent().html(replaceURLs(tempTaskName));
+            $(this).parent().html(replaceURLs(newName));
         }
         $(this).remove();
-    }
-    else if (e.keyCode == 27) {
-        let prevValue = $(this).attr('prevvalue');
-        $(this).parent().html(replaceURLs(prevValue));
+    } else if (e.key === 'Escape') {
+        const previousValue = $(this).attr('prevvalue');
+        $(this).parent().html(replaceURLs(previousValue));
         $(this).remove();
     }
 });
@@ -104,22 +97,21 @@ $('#date-list-container, #task-detail-container').on('keydown', '#update-task-na
 
 //event listener to toggle checkbox completion
 $('#date-list-container').on('click', '.todo-task-check', function () {
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    let statusCode = $(this).attr('statuscode');
-    let newStatusCode = statusCode == 1001 ? 1004 : 1001;
-    updateTasks(dateID, taskID, '', newStatusCode, '');
-
+    const dateId = $(this).val().slice(5, 15);
+    const taskId = $(this).val().slice(16);
+    const statusCode = Number($(this).attr('statuscode'));
+    const newStatusCode = statusCode === 1001 ? 1004 : 1001;
+    updateTasks(dateId, taskId, '', newStatusCode, '');
 });
 
 //event listener to create the detail view
 $('#date-list-container').on('click', '.todo-task-detail', function () {
     bsOffcanvas.show();
-    let dateID = $(this).val().slice(5, 15);
-    let taskID = $(this).val().slice(16);
-    let newObj = findTask(dateID, taskID);
+    const dateId = $(this).val().slice(5, 15);
+    const taskId = $(this).val().slice(16);
+    const taskObj = findTask(dateId, taskId);
     $('#task-detail-container').empty();
-    $('#task-detail-container').append(renderTaskDetailHTML(newObj));
+    $('#task-detail-container').append(renderTaskDetailHTML(taskObj));
 });
 
 // event listener to select multiple tasks
@@ -131,13 +123,20 @@ $('#date-list-container').on('click', '.list-group-item', function (e) {
     }
 });
 
-//event listener to open context menu
+// Open context menu on right-click
 $('#date-list-container').on('contextmenu', '.list-group-item', function (e) {
     e.preventDefault();
-    $('#context-menu').toggle().css({
+    $('#context-menu').show().css({
         left: e.pageX,
         top: e.pageY
     });
+});
+
+// Dismiss context menu when clicking anywhere outside it
+$(document).on('click', function (e) {
+    if (!$(e.target).closest('#context-menu').length) {
+        $('#context-menu').hide();
+    }
 });
 
 
@@ -153,45 +152,43 @@ $('#task-detail-container').on('mousedown', '.headings-box', function (e) {
 //adding headings to notes area
 $('#task-detail-container').on('mousedown', '#headings-box-container button', function (e) {
     e.preventDefault();
-    let dateID = $('#task-notes-area').attr('value').slice(5, 15);
-    let taskID = $('#task-notes-area').attr('value').slice(16);
-    let heading = $(this).attr('value');
-    let focus = $('#task-notes-area').is(':focus');
-    if (focus === true) {
-        let sel = window.getSelection();
-        let range = sel.getRangeAt(0);
-        let headingElement = document.createElement(`${heading}`);
-        headingElement.innerHTML = `${sel.toString()}`;
-        range.deleteContents();
-        range.insertNode(headingElement);
-    }
-    else {
-        let headingElement = `<${heading}>Heading ${heading.slice(1, 2)}</${heading}>`;
-        $('#task-notes-area').append(headingElement);
+    const { dateId, taskId } = getNotesTaskIds();
+    const headingTag = $(this).attr('value');
+    const isFocused = $('#task-notes-area').is(':focus');
 
+    if (isFocused) {
+        try {
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            const headingEl = document.createElement(headingTag);
+            headingEl.innerHTML = selection.toString();
+            range.deleteContents();
+            range.insertNode(headingEl);
+        } catch (error) {
+            console.error('listeners.js — heading insert failed:', error);
+        }
+    } else {
+        const headingMarkup = `<${headingTag}>Heading ${headingTag.slice(1, 2)}</${headingTag}>`;
+        $('#task-notes-area').append(headingMarkup);
     }
-    updateTasks(dateID, taskID, '', '', true);
+
+    updateTasks(dateId, taskId, '', '', true);
     $('#headings-box-container').hide();
     $('.headings-box').removeClass('btn-no-bg-gray-active');
 });
 
-
 //adding ordered list to notes area
-$('#task-detail-container').on('click', '.ol-box', function (e) {
-    let dateID = $('#task-notes-area').attr('value').slice(5, 15);
-    let taskID = $('#task-notes-area').attr('value').slice(16);
-    let olList = `<ol><li>An Item here</li></ol>`
-    $('#task-notes-area').append(olList);
-    updateTasks(dateID, taskID, '', '', true);
+$('#task-detail-container').on('click', '.ol-box', function () {
+    const { dateId, taskId } = getNotesTaskIds();
+    $('#task-notes-area').append('<ol><li>An Item here</li></ol>');
+    updateTasks(dateId, taskId, '', '', true);
 });
 
 //adding unordered list to notes area
-$('#task-detail-container').on('click', '.ul-box', function (e) {
-    let dateID = $('#task-notes-area').attr('value').slice(5, 15);
-    let taskID = $('#task-notes-area').attr('value').slice(16);
-    let ulList = `<ul><li>An Item here</li></ul>`
-    $('#task-notes-area').append(ulList);
-    updateTasks(dateID, taskID, '', '', true);
+$('#task-detail-container').on('click', '.ul-box', function () {
+    const { dateId, taskId } = getNotesTaskIds();
+    $('#task-notes-area').append('<ul><li>An Item here</li></ul>');
+    updateTasks(dateId, taskId, '', '', true);
 });
 
 //colors box toggle
@@ -201,20 +198,21 @@ $('#task-detail-container').on('click', '.colors-box', function () {
 });
 
 //adding color to selected font
-$('#task-detail-container').on('click', '#colors-box-container button', function (e) {
-    let dateID = $('#task-notes-area').attr('value').slice(5, 15);
-    let taskID = $('#task-notes-area').attr('value').slice(16);
-    //get cursor position
-    let sel = window.getSelection();
-    let coloredText = document.createElement('span');
-    coloredText.innerText = sel.toString();
-    coloredText.style.color = $(this).val();
-    sel.getRangeAt(0).deleteContents();
-    sel.getRangeAt(0).insertNode(coloredText);
-    updateTasks(dateID, taskID, '', '', true);
+$('#task-detail-container').on('click', '#colors-box-container button', function () {
+    const { dateId, taskId } = getNotesTaskIds();
+    try {
+        const selection = window.getSelection();
+        const colorSpan = document.createElement('span');
+        colorSpan.innerText = selection.toString();
+        colorSpan.style.color = $(this).val();
+        selection.getRangeAt(0).deleteContents();
+        selection.getRangeAt(0).insertNode(colorSpan);
+    } catch (error) {
+        console.error('listeners.js — font colour failed:', error);
+    }
+    updateTasks(dateId, taskId, '', '', true);
     $('#colors-box-container').hide();
     $('.colors-box').removeClass('btn-no-bg-gray-active');
-
 });
 
 //background box toggle
@@ -224,79 +222,77 @@ $('#task-detail-container').on('click', '.background-box', function () {
 });
 
 //adding background color to selected font
-$('#task-detail-container').on('click', '#background-box-container button', function (e) {
-    let dateID = $('#task-notes-area').attr('value').slice(5, 15);
-    let taskID = $('#task-notes-area').attr('value').slice(16);
-    //get cursor position
-    let sel = window.getSelection();
-    let backgroundText = document.createElement('span');
-    backgroundText.innerText = sel.toString();
-    backgroundText.style.backgroundColor = $(this).val();
-    sel.getRangeAt(0).deleteContents();
-    sel.getRangeAt(0).insertNode(backgroundText);
-    updateTasks(dateID, taskID, '', '', true);
+$('#task-detail-container').on('click', '#background-box-container button', function () {
+    const { dateId, taskId } = getNotesTaskIds();
+    try {
+        const selection = window.getSelection();
+        const bgSpan = document.createElement('span');
+        bgSpan.innerText = selection.toString();
+        bgSpan.style.backgroundColor = $(this).val();
+        selection.getRangeAt(0).deleteContents();
+        selection.getRangeAt(0).insertNode(bgSpan);
+    } catch (error) {
+        console.error('listeners.js — background colour failed:', error);
+    }
+    updateTasks(dateId, taskId, '', '', true);
     $('#background-box-container').hide();
     $('.background-box').removeClass('btn-no-bg-gray-active');
-
 });
 
 // save notes on blur
 $('#task-detail-container').on('blur', '#task-notes-area', function () {
-    let dateID = $('#task-notes-area').attr('value').slice(5, 15);
-    let taskID = $('#task-notes-area').attr('value').slice(16);
-    updateTasks(dateID, taskID, '', '', true);
+    const { dateId, taskId } = getNotesTaskIds();
+    updateTasks(dateId, taskId, '', '', true);
 });
 
 //keypress listener here for notes area
 $('#task-detail-container').on('keydown', '#task-notes-area', function (e) {
-    //get cursor position
-    let sel = window.getSelection();
-    let range = sel.getRangeAt(0);
+    try {
+        const selection = window.getSelection();
+        const range = selection.getRangeAt(0);
 
+        // Tab → insert unordered list
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const ulElement = document.createElement('ul');
+            ulElement.innerHTML = '<li></li>';
+            range.insertNode(ulElement);
+            range.selectNodeContents(ulElement);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
 
-    switch (e.keyCode) {
-        case 9:
-            {
-                e.preventDefault();
-                //get cursor position - unordered lists
-                let ulElement = document.createElement('ul');
-                ulElement.innerHTML = '<li></li>'
-                range.insertNode(ulElement);
-                range.selectNodeContents(ulElement);
-                sel.removeAllRanges();
-                sel.addRange(range);
-                break;
+        // Ctrl+9 → insert ordered list
+        if (e.ctrlKey && e.key === '9') {
+            const olElement = document.createElement('ol');
+            olElement.innerHTML = '<li></li>';
+            range.insertNode(olElement);
+            range.selectNodeContents(olElement);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        // Ctrl+K → convert selection to hyperlink
+        if (e.ctrlKey && e.key === 'k') {
+            e.preventDefault();
+            const linkUrl = prompt('please enter URL here', 'https://google.com');
+            if (linkUrl) {
+                const linkWrapper = document.createElement('span');
+                linkWrapper.innerHTML = `<a href="${linkUrl}" target="_blank">${selection.toString()}</a>`;
+                range.deleteContents();
+                range.insertNode(linkWrapper);
             }
-
-
-        case 57:
-            if (e.ctrlKey) {
-                let sel = window.getSelection();
-                let olElement = document.createElement('ol');
-                olElement.innerHTML = '<li></li>'
-                range.insertNode(olElement);
-                range.selectNodeContents(olElement);
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-            break;
-
-        case 75:
-            if (e.ctrlKey) {
-                e.preventDefault();
-                //get cursor position
-                let anchorTag = document.createElement('span');
-                let anchorLink = prompt('please enter URL here', 'https://google.com');
-                if (anchorLink) {
-                    anchorTag.innerHTML = `<a href=${anchorLink} target="_blank">${sel.toString()}</a>`
-                    range.deleteContents();
-                    range.insertNode(anchorTag);
-                }
-            }
-            break;
-
-        default:
-            break;
+        }
+    } catch (error) {
+        console.error('listeners.js — notes keydown handler failed:', error);
     }
-
 });
+
+/**
+ * Helper — extract dateId and taskId from the task-notes-area value attribute.
+ * @returns {{dateId: string, taskId: string}}
+ */
+function getNotesTaskIds() {
+    const value = $('#task-notes-area').attr('value');
+    return { dateId: value.slice(5, 15), taskId: value.slice(16) };
+}

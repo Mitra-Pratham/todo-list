@@ -1,266 +1,281 @@
-//saving notes
+// ============================================================
+// notes-listeners.js — Event listeners for the Notes detail page
+// ============================================================
+
+// ─── Auto-Save ───────────────────────────────────────────────
+
+// Save notes content when the editor loses focus
 $('#notes-detail-container').on('blur', '#notes-detail-area', function () {
-    let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID,true,false);
+    const pageId = $('#notes-detail-area').attr('value');
+    saveText(pageId, true, false);
 });
 
-//headings box toggle
-$('#notes-detail-container').on('mousedown', '.headings-box, .colors-box, .background-box', function (e) {
+// ─── RTF Toolbar Toggles ────────────────────────────────────
 
+// Toggle headings / colours / background pickers
+$('#notes-detail-container').on('mousedown', '.headings-box, .colors-box, .background-box', function (e) {
     e.preventDefault();
     if ($(this).hasClass('headings-box')) {
         $('.headings-box').toggleClass('btn-no-bg-gray-active');
         $('#headings-box-container').toggle();
-    }
-    else if ($(this).hasClass('colors-box')) {
+    } else if ($(this).hasClass('colors-box')) {
         $('.colors-box').toggleClass('btn-no-bg-gray-active');
         $('#colors-box-container').toggle();
-    }
-    else if ($(this).hasClass('background-box')) {
+    } else if ($(this).hasClass('background-box')) {
         $('.background-box').toggleClass('btn-no-bg-gray-active');
         $('#background-box-container').toggle();
     }
 });
 
-//common function to set background color, font color and heading based on selection
-function getSelectionInsertNode(type, value) {
-    let HTMLElement = '';
-    let sel = window.getSelection();
-    let range = sel.getRangeAt(0);
-    switch (type) {
-        case 'heading':
-            {
-                HTMLElement = document.createElement(`${value}`);
-                HTMLElement.innerHTML = `${sel.toString()}`;
-            }
-            break;
-        case 'color':
-            {
-                HTMLElement = document.createElement(`span`);
-                HTMLElement.innerText = `${sel.toString()}`;
-                HTMLElement.style.color = value;
-            }
-            break;
-        case 'background':
-            {
-                HTMLElement = document.createElement(`span`);
-                HTMLElement.innerText = `${sel.toString()}`;
-                HTMLElement.style.backgroundColor = value;
-            }
-            break;
+// ─── Selection Formatting Helper ─────────────────────────────
 
-        default:
-            break;
+/**
+ * Insert a styled DOM node at the current text selection.
+ * @param {'heading'|'color'|'background'} formatType
+ * @param {string} value - tag name (e.g. 'h2') or CSS colour value
+ */
+function insertFormattedNode(formatType, value) {
+    try {
+        const selection = window.getSelection();
+        const range = selection.getRangeAt(0);
+        let newElement = null;
+
+        switch (formatType) {
+            case 'heading':
+                newElement = document.createElement(value);
+                newElement.innerHTML = selection.toString();
+                break;
+            case 'color':
+                newElement = document.createElement('span');
+                newElement.innerText = selection.toString();
+                newElement.style.color = value;
+                break;
+            case 'background':
+                newElement = document.createElement('span');
+                newElement.innerText = selection.toString();
+                newElement.style.backgroundColor = value;
+                break;
+            default:
+                return;
+        }
+
+        range.deleteContents();
+        range.insertNode(newElement);
+    } catch (error) {
+        console.error('notes-listeners.js — insertFormattedNode failed:', error);
     }
-    
-    range.deleteContents();
-    range.insertNode(HTMLElement);
 }
 
-//adding headings to notes area
-$('#notes-detail-container').on('mousedown', '#headings-box-container button', function (e) {
-    //get cursor position
-    e.preventDefault();
-    let heading = $(this).attr('value');
-    let focus = $('#notes-detail-area').is(':focus');
-    if (focus === true) {
-        getSelectionInsertNode('heading', heading);
-    }
-    else {
-        let headingElement = `<${heading}>Heading ${heading.slice(1, 2)}</${heading}>`;
-        $('#notes-detail-area').append(headingElement);
+// ─── Heading / Colour / Background Insertion ─────────────────
 
+// Insert heading into notes area
+$('#notes-detail-container').on('mousedown', '#headings-box-container button', function (e) {
+    e.preventDefault();
+    const headingTag = $(this).attr('value');
+    const isFocused = $('#notes-detail-area').is(':focus');
+
+    if (isFocused) {
+        insertFormattedNode('heading', headingTag);
+    } else {
+        const headingMarkup = `<${headingTag}>Heading ${headingTag.slice(1, 2)}</${headingTag}>`;
+        $('#notes-detail-area').append(headingMarkup);
     }
-    let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID,true,false);
+
+    const pageId = $('#notes-detail-area').attr('value');
+    saveText(pageId, true, false);
     $('#headings-box-container').hide();
     $('.headings-box').removeClass('btn-no-bg-gray-active');
 });
 
-//adding color to selected font
-$('#notes-detail-container').on('mousedown', '#colors-box-container button' , function (e) {
+// Apply font colour to selected text
+$('#notes-detail-container').on('mousedown', '#colors-box-container button', function (e) {
     e.preventDefault();
-    let color = $(this).attr('value');
-    let focus = $('#notes-detail-area').is(':focus');
-    if (focus === true) {
-        getSelectionInsertNode('color', color);
+    const colorValue = $(this).attr('value');
+    const isFocused = $('#notes-detail-area').is(':focus');
+
+    if (isFocused) {
+        insertFormattedNode('color', colorValue);
     }
-    let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID,true,false);
-    $('#colors-box-container ').hide();
+
+    const pageId = $('#notes-detail-area').attr('value');
+    saveText(pageId, true, false);
+    $('#colors-box-container').hide();
     $('.colors-box').removeClass('btn-no-bg-gray-active');
-
 });
 
-//adding background color to selected font
-$('#notes-detail-container').on('mousedown', '#background-box-container button' , function (e) {
+// Apply background colour to selected text
+$('#notes-detail-container').on('mousedown', '#background-box-container button', function (e) {
     e.preventDefault();
-    let bg = $(this).attr('value');
-    let focus = $('#notes-detail-area').is(':focus');
-    if (focus === true) {
-        getSelectionInsertNode('background', bg);
+    const bgValue = $(this).attr('value');
+    const isFocused = $('#notes-detail-area').is(':focus');
+
+    if (isFocused) {
+        insertFormattedNode('background', bgValue);
     }
-    let pageID = $('#notes-detail-area').attr('value');
-    saveText(pageID,true,false);
-    $('#background-box-container ').hide();
+
+    const pageId = $('#notes-detail-area').attr('value');
+    saveText(pageId, true, false);
+    $('#background-box-container').hide();
     $('.background-box').removeClass('btn-no-bg-gray-active');
-
 });
 
-//adding sections
-$('#notes-detail-container').on('click', '.add-sections-box', function (e) {
-    let val = $(this).attr('value');
-    // let textAreaID = $('.active-area').attr('id');
-    addSections(val);
+// ─── Sections ────────────────────────────────────────────────
+
+// Add a section above or below the notes area
+$('#notes-detail-container').on('click', '.add-sections-box', function () {
+    const position = $(this).attr('value');
+    addSections(position);
 });
 
-//create page function
-$('#notes-detail-container').on('click', '#createPage', function (e) {
+// ─── Page Management ─────────────────────────────────────────
+
+// Create a new page
+$('#notes-detail-container').on('click', '#createPage', () => {
     createPage();
 });
 
-//import page function
+// Import a page from a local file
 $('#notes-detail-container').on('click', '#importPage', async function () {
-    let fileHandle;
-    [fileHandle] = await window.showOpenFilePicker();
-    const file = await fileHandle.getFile();
-    const fileHandleName = await fileHandle.name;
-    const fileName = fileHandleName.substr(0, fileHandleName.lastIndexOf('.'));
-    const contents = await file.text();
-    createPage(contents, fileName);
+    try {
+        const [fileHandle] = await window.showOpenFilePicker();
+        const file = await fileHandle.getFile();
+        const fileName = fileHandle.name.slice(0, fileHandle.name.lastIndexOf('.'));
+        const contents = await file.text();
+        createPage(contents, fileName);
+    } catch (error) {
+        console.error('notes-listeners.js — file import failed:', error);
+    }
 });
 
-//navigate to page
-$('#notes-detail-container').on('click', '.page-tab', function (e) {
-    let pageID = $(this).attr('id');
-    let tempObj = findPage(pageID);
-    renderNotesDetailHTML(tempObj);
+// Navigate to a page tab
+$('#notes-detail-container').on('click', '.page-tab', function () {
+    const pageId = $(this).attr('id');
+    const pageObj = findPage(pageId);
+    renderNotesDetailHTML(pageObj);
 });
 
-//right click menu for pages
-$('#notes-detail-container').on('contextmenu', '.page-tab', function(e){
+// Right-click context menu for page tabs
+$('#notes-detail-container').on('contextmenu', '.page-tab', function (e) {
     e.preventDefault();
-    let tempEL = $(this).next();
-    let tempElOpen = tempEL.hasClass('section-open');
+    const menuEl = $(this).next();
+    const isOpen = menuEl.hasClass('section-open');
     $('.section-open').hide().removeClass('section-open');
-    if(!tempElOpen){
-        tempEL.show().addClass('section-open');
+    if (!isOpen) {
+        menuEl.show().addClass('section-open');
     }
 });
 
-//deleting pages event listener
-$('#notes-detail-container').on('click', '.delete-page', function(e){
-    let pageID = $(this).parent().attr('value');
-    deletePage(pageID);
+// Delete a page
+$('#notes-detail-container').on('click', '.delete-page', function () {
+    const pageId = $(this).parent().attr('value');
+    deletePage(pageId);
 });
 
-//renamaing the page event listener
-$('#notes-detail-container').on('click', '.rename-page', function(e){
-    let pageID = $(this).parent().attr('value');
-    let currentName = $(this).parent().prev().text().trim();
-    let newName = prompt('Rename the page', currentName);
-    if(newName !==null){
-        saveText(pageID,false,newName);
+// Rename a page
+$('#notes-detail-container').on('click', '.rename-page', function () {
+    const pageId = $(this).parent().attr('value');
+    const currentName = $(this).parent().prev().text().trim();
+    const newName = prompt('Rename the page', currentName);
+    if (newName !== null) {
+        saveText(pageId, false, newName);
     }
 });
 
-//get filehandle for export
-async function getNewFileHandle(fileName) {
+// ─── File Export ─────────────────────────────────────────────
+
+/**
+ * Show a "Save As" dialog and return the file handle.
+ * @param {string} suggestedName
+ * @returns {Promise<FileSystemFileHandle>}
+ */
+async function getNewFileHandle(suggestedName) {
     const options = {
-        suggestedName: fileName,
+        suggestedName,
         startIn: 'downloads',
-        types: [
-            {
-                description: 'Text Files',
-                accept: {
-                    'text/plain': ['.html'],
-                },
-            },
-        ],
+        types: [{
+            description: 'HTML Files',
+            accept: { 'text/plain': ['.html'] },
+        }],
     };
-    const handle = await window.showSaveFilePicker(options);
-    return handle;
+    return await window.showSaveFilePicker(options);
 }
 
+/**
+ * Write string contents to a file handle.
+ * @param {FileSystemFileHandle} fileHandle
+ * @param {string} contents
+ */
 async function writeFile(fileHandle, contents) {
-    // Create a FileSystemWritableFileStream to write to.
     const writable = await fileHandle.createWritable();
-    // Write the contents of the file to the stream.
     await writable.write(contents);
-    // Close the file and write the contents to disk.
     await writable.close();
 }
 
-//exporting the page
-$('#notes-detail-container').on('click', '.export-page', function(e){
-    let pageID = $(this).parent().attr('value');
-    let pageItem = findPage(pageID);
-    let currentName = $(this).parent().prev().text().trim();
-    let fileContents = pageItem.html;
-    getNewFileHandle(currentName).then((result) => {
-        writeFile(result, fileContents);
-        $('.section-open').hide().removeClass('section-open');
-    })
+// Export the current page as an HTML file
+$('#notes-detail-container').on('click', '.export-page', function () {
+    const pageId = $(this).parent().attr('value');
+    const pageObj = findPage(pageId);
+    const pageName = $(this).parent().prev().text().trim();
+
+    getNewFileHandle(pageName)
+        .then((handle) => {
+            writeFile(handle, pageObj.html);
+            $('.section-open').hide().removeClass('section-open');
+        })
+        .catch((error) => {
+            console.error('notes-listeners.js — export failed:', error);
+        });
 });
 
-//keypress listener here for notes area
+// ─── Notes Keyboard Shortcuts ────────────────────────────────
+
 $('#notes-detail-container').on('keydown', '#notes-detail-area', function (e) {
-    //get cursor position
-    let sel = window.getSelection();
-    let range = sel.getRangeAt(0);
+    try {
+        const selection = window.getSelection();
+        const range = selection.getRangeAt(0);
 
+        // Tab → insert unordered list
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const ulElement = document.createElement('ul');
+            ulElement.innerHTML = '<li></li>';
+            range.insertNode(ulElement);
+            range.selectNodeContents(ulElement);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
 
-    switch (e.keyCode) {
-        case 9:
-            {
-                e.preventDefault();
-                let ulElement = document.createElement('ul');
-                ulElement.innerHTML = '<li></li>'
-                range.insertNode(ulElement);
-                range.selectNodeContents(ulElement);
-                sel.removeAllRanges();
-                sel.addRange(range);
-                break;
-            }
+        // Ctrl+9 → insert ordered list
+        if (e.ctrlKey && e.key === '9') {
+            const olElement = document.createElement('ol');
+            olElement.innerHTML = '<li></li>';
+            range.insertNode(olElement);
+            range.selectNodeContents(olElement);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
 
-
-        case 57:
-            if (e.ctrlKey) {
-                let sel = window.getSelection();
-                let olElement = document.createElement('ol');
-                olElement.innerHTML = '<li></li>'
-                range.insertNode(olElement);
-                range.selectNodeContents(olElement);
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-            break;
-
-        case 75:
-            if (e.ctrlKey) {
-                e.preventDefault();
-                let anchorTag = document.createElement('span');
-                let anchorLink = prompt('please enter URL here', 'https://google.com');
-                if (anchorLink) {
-                    anchorTag.innerHTML = `<a href=${anchorLink} target="_blank">${sel.toString()}</a>`
-                    range.deleteContents();
-                    range.insertNode(anchorTag);
-                }
-            }
-            break;
-
-        case 192:
-            if (e.ctrlKey) {
-                e.preventDefault();
-                let codeTag = document.createElement('code');
-                codeTag.innerHTML = `${sel.toString()}`
+        // Ctrl+K → convert selection to hyperlink
+        if (e.ctrlKey && e.key === 'k') {
+            e.preventDefault();
+            const linkUrl = prompt('Please enter URL here', 'https://google.com');
+            if (linkUrl) {
+                const linkWrapper = document.createElement('span');
+                linkWrapper.innerHTML = `<a href="${linkUrl}" target="_blank">${selection.toString()}</a>`;
                 range.deleteContents();
-                range.insertNode(codeTag);
+                range.insertNode(linkWrapper);
             }
-            break;
+        }
 
-        default:
-            break;
+        // Ctrl+` → convert selection to code block
+        if (e.ctrlKey && e.key === '`') {
+            e.preventDefault();
+            const codeElement = document.createElement('code');
+            codeElement.innerHTML = selection.toString();
+            range.deleteContents();
+            range.insertNode(codeElement);
+        }
+    } catch (error) {
+        console.error('notes-listeners.js — keydown handler failed:', error);
     }
-
 });

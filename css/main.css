@@ -311,7 +311,10 @@ input:hover {
   border: 1px solid rgba(var(--bs-primary-rgb), 1);
 }
 
+/* Skip layout/paint for off-screen date lists (CSS Containment) */
 .date-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
   background-color: var(--bs-light);
   border-radius: var(--card-radius);
 

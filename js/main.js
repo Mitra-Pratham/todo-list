@@ -1,49 +1,77 @@
+// ============================================================
+// main.js — App entry point, rendering, and task CRUD operations
+// ============================================================
+
 import { initAuth, getCurrentUser } from "./auth.js";
 import { TodoService } from "./todo-service.js";
 import { hasLocalData, getLocalTasks, migrateData } from "./migration.js";
 
+/** Firestore snapshot unsubscribe handle */
 let unsubscribe;
 
+/**
+ * Previous snapshot data keyed by date-list ID, used for differential rendering.
+ * @type {Map<string, object>}
+ */
+const previousDateListMap = new Map();
+
+/** Debounce timer ID for snapshot-driven rendering */
+let renderDebounceTimer = null;
+
+/** Debounce delay in milliseconds for collapsing rapid Firestore snapshots */
+const RENDER_DEBOUNCE_MS = 100;
+
+// ─── Status Code Constants ───────────────────────────────────
+const STATUS_TODO      = 1001;
+const STATUS_ONGOING   = 1002;
+const STATUS_BLOCKED   = 1003;
+const STATUS_COMPLETED = 1004;
+const STATUS_ARCHIVED  = 1005;
+
+/** Map status codes to human-readable labels */
+const STATUS_LABELS = {
+    [STATUS_TODO]:      'To-Do',
+    [STATUS_ONGOING]:   'Ongoing',
+    [STATUS_BLOCKED]:   'Blocked',
+    [STATUS_COMPLETED]: 'Completed',
+    [STATUS_ARCHIVED]:  'Archived',
+};
+
+// ─── App Initialisation ──────────────────────────────────────
+
+/** Bootstrap the app: set up auth listeners and Firestore subscriptions. */
 function initApp() {
     initAuth(async (user) => {
-        console.log("User logged in:");
+        console.log("User logged in");
 
-        // Check for local data and migrate if needed
+        // Migrate local IndexedDB data to Firestore if present
         if (await hasLocalData()) {
             const migrated = await migrateData(user.uid);
             if (migrated) {
                 const successDiv = $('#success-message');
-                successDiv.html(`<strong>Success!</strong> Migration complete! Your data is now in the cloud.`);
+                successDiv.html('<strong>Success!</strong> Migration complete! Your data is now in the cloud.');
                 successDiv.show();
                 setTimeout(() => successDiv.fadeOut(), 5000);
             }
         }
 
-        unsubscribe = TodoService.subscribe(user.uid, (data) => {
-            renderDateList(data);
-            renderDateNav(data);
+        // Subscribe to real-time Firestore updates with debounced rendering
+        unsubscribe = TodoService.subscribe(user.uid, (dateLists) => {
+            debouncedRender(dateLists);
         });
 
-        // Hide warning if user logs in
         $('#failure-message').hide();
 
     }, async () => {
         console.log("User logged out");
         if (unsubscribe) unsubscribe();
 
-        // Check for local data
         if (await hasLocalData()) {
             console.log("Found local data, displaying...");
             const localTasks = await getLocalTasks();
-
-            // Set global taskArray for other functions to use
-            taskArray = bubbleSort(localTasks).reverse();
-
-            // renderDateList expects the array, and internally sets taskArray but let's be safe
-            // Actually renderDateList sets taskArray: taskArray = bubbleSort(data).reverse();
+            taskArray = sortByDate(localTasks).reverse();
             renderDateList(localTasks);
             renderDateNav(localTasks);
-
             showMigrationWarning();
         } else {
             taskArray = [];
@@ -53,17 +81,29 @@ function initApp() {
     });
 }
 
-// Helper to show migration warning
+/**
+ * Debounce wrapper — collapses rapid consecutive snapshot callbacks
+ * into a single render pass (e.g. when marking many tasks done at once).
+ * @param {Array} dateLists - raw snapshot data from Firestore
+ */
+function debouncedRender(dateLists) {
+    clearTimeout(renderDebounceTimer);
+    renderDebounceTimer = setTimeout(() => {
+        renderDateList(dateLists);
+        renderDateNav(dateLists);
+    }, RENDER_DEBOUNCE_MS);
+}
+
+/** Show migration warning banner with login link. */
 function showMigrationWarning() {
-    // Use the failure-message alert div, repurposed as a warning for migration
     const alertDiv = $('#failure-message');
     if (alertDiv.length) {
         alertDiv.removeClass('alert-danger').addClass('alert-warning');
-        alertDiv.html(`<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.`);
+        alertDiv.html('<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.');
         alertDiv.show();
 
-        $('#migration-login-link').off('click').on('click', (e) => {
-            e.preventDefault();
+        $('#migration-login-link').off('click').on('click', (event) => {
+            event.preventDefault();
             document.getElementById('login-btn').click();
         });
     }
@@ -72,281 +112,337 @@ function showMigrationWarning() {
 // Start the app
 initApp();
 
-///----------------functions---------------------------
+// ─── UI Helpers ──────────────────────────────────────────────
 
-
-//set status message function
+/**
+ * Show a success or failure toast message for 4 seconds.
+ * @param {'success'|'failure'} type
+ * @param {string} message
+ */
 function setMessageState(type, message) {
-    $(`#${type}-message`).text(message);
-    $(`#${type}-message`).show();
-    setTimeout(() => {
-        $(`#${type}-message`).hide();
-    }, 4000);
+    const messageEl = $(`#${type}-message`);
+    messageEl.text(message);
+    messageEl.show();
+    setTimeout(() => messageEl.hide(), 4000);
 }
 
-//create and update date and task lists
-//create and update date and task lists
-// NOTE: This function is now only used for creating NEW date lists, not for general updates
-// The reactive listener handles the UI updates.
-async function createUpdateDateList(data, messageType, messageText) {
-    // In the new reactive model, we don't manually render or save everything here.
-    // We just trigger the service action.
-    // However, for "Create Date List" button which passes the whole new array with the new date list:
-
-    // Find the new item (it's the one not in Firestore yet, but here we are passed the whole array)
-    // Actually, let's refactor the caller of this function to call TodoService directly.
-    // But to keep it compatible for now, let's see where it's called.
-    // It's called by deleteDateList, createTask, deleteTasks, updateTasks.
-
-    // We should refactor those functions instead.
-    // But if we must keep this signature for now:
-
-    // For now, let's just show the message. The data update should happen via Service.
-    setMessageState(messageType, messageText);
+/**
+ * Count how many tasks in a list have status "Completed".
+ * @param {Array<{statusCode: number}>} tasks
+ * @returns {number}
+ */
+function countCompletedTasks(tasks) {
+    return tasks.filter((task) => task.statusCode === STATUS_COMPLETED).length;
 }
 
-//function to render the date list HTML
-function renderDateList(data) {
+/**
+ * Get a human-readable label for a status code.
+ * @param {number} statusCode
+ * @returns {string}
+ */
+function getStatusLabel(statusCode) {
+    return STATUS_LABELS[statusCode] ?? '';
+}
 
-    taskArray = bubbleSort(data).reverse();
+// ─── Differential Rendering — Date Lists ─────────────────────
 
+/**
+ * Render the main date-list view. Uses differential updates:
+ * only re-renders date lists that have actually changed.
+ * @param {Array} dateLists - array of date-list objects from Firestore
+ */
+function renderDateList(dateLists) {
+    taskArray = sortByDate(dateLists).reverse();
 
-    $('#date-list-container').empty();
-    let tempHtml = data.map(function (el) {
-        return `
-         <div id="date-item-${el.id}" class="mb-4 p-3 date-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="d-flex align-items-start">
-                        <div class="d-grid">
-                            <h4 class="mb-1">${el.name}</h4>
-                            <div class="d-flex align-items-center mb-2">
-                                <p class="tasks-summary mb-0">${renderTaskListCount(el.taskList)} tasks completed out of ${el.taskList.length}</p>
-                                <button type="button" class="btn btn-sm btn-no-bg-gray ms-1 mark-all-done-btn" value="${el.id}">
-                                    <i class="fa-${renderTaskListCount(el.taskList) === el.taskList.length && el.taskList.length > 0 ? 'solid fa-check text-primary' : 'solid fa-check'}"></i>
-                                    <span class="btn-title">Mark All As Complete</span>
-                                </button>
-                            </div>
+    const container = document.getElementById('date-list-container');
+    const incomingIds = new Set(taskArray.map((dl) => dl.id));
+
+    // Remove date lists that no longer exist
+    for (const [existingId] of previousDateListMap) {
+        if (!incomingIds.has(existingId)) {
+            const existingEl = document.getElementById(`date-item-${existingId}`);
+            if (existingEl) existingEl.remove();
+            previousDateListMap.delete(existingId);
+        }
+    }
+
+    // Add or update each date list
+    for (const dateItem of taskArray) {
+        const previousData = previousDateListMap.get(dateItem.id);
+        const hasChanged = !previousData || JSON.stringify(previousData) !== JSON.stringify(dateItem);
+
+        if (hasChanged) {
+            const existingEl = document.getElementById(`date-item-${dateItem.id}`);
+            const newMarkup = buildDateListHTML(dateItem);
+
+            if (existingEl) {
+                // Preserve input field focus state before replacing
+                const inputEl = existingEl.querySelector('.create-task-input');
+                const hadFocus = document.activeElement === inputEl;
+
+                existingEl.outerHTML = newMarkup;
+
+                // Restore focus after DOM replacement (value is intentionally not restored
+                // so that a successful task-add clears the field as expected)
+                if (hadFocus) {
+                    const restoredInput = document.getElementById(`todo-input-${dateItem.id}`);
+                    if (restoredInput) restoredInput.focus();
+                }
+            } else {
+                // New date list — insert in sorted position
+                const insertIndex = taskArray.indexOf(dateItem);
+                const children = container.children;
+
+                if (insertIndex >= children.length) {
+                    container.insertAdjacentHTML('beforeend', newMarkup);
+                } else {
+                    children[insertIndex].insertAdjacentHTML('beforebegin', newMarkup);
+                }
+            }
+
+            previousDateListMap.set(dateItem.id, JSON.parse(JSON.stringify(dateItem)));
+        }
+    }
+}
+
+/**
+ * Build the full HTML string for a single date list card.
+ * @param {{id: string, name: string, taskList: Array}} dateItem
+ * @returns {string}
+ */
+function buildDateListHTML(dateItem) {
+    const completedCount = countCompletedTasks(dateItem.taskList);
+    const totalCount = dateItem.taskList.length;
+    const allDone = completedCount === totalCount && totalCount > 0;
+    const checkIconClass = allDone ? 'solid fa-check text-primary' : 'solid fa-check';
+
+    const tasksMarkup = dateItem.taskList.map((task) => buildTaskHTML(task)).join('');
+
+    return `
+        <div id="date-item-${dateItem.id}" class="mb-4 p-3 date-item">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="d-flex align-items-start">
+                    <div class="d-grid">
+                        <h4 class="mb-1">${dateItem.name}</h4>
+                        <div class="d-flex align-items-center mb-2">
+                            <p class="tasks-summary mb-0">${completedCount} tasks completed out of ${totalCount}</p>
+                            <button type="button" class="btn btn-sm btn-no-bg-gray ms-1 mark-all-done-btn" value="${dateItem.id}">
+                                <i class="fa-${checkIconClass}"></i>
+                                <span class="btn-title">Mark All As Complete</span>
+                            </button>
                         </div>
-                        <button type="button" class="btn btn-sm btn-no-bg-gray ms-2 todo-date-delete" value="${el.id}">
-                            <i class="fa-solid fa-trash"></i>
-                            <span class="btn-title">Delete Date List</span>
-                        </button>
                     </div>
-                    <div class="d-flex">
-                        <div class="todo-input-form">
-                            <input type="text" class="form-control create-task-input" id="todo-input-${el.id}" placeholder="Add Task" 
-                            enterkeyhint="send"size="75">
-                        </div>
+                    <button type="button" class="btn btn-sm btn-no-bg-gray ms-2 todo-date-delete" value="${dateItem.id}">
+                        <i class="fa-solid fa-trash"></i>
+                        <span class="btn-title">Delete Date List</span>
+                    </button>
+                </div>
+                <div class="d-flex">
+                    <div class="todo-input-form">
+                        <input type="text" class="form-control create-task-input" id="todo-input-${dateItem.id}" placeholder="Add Task"
+                            enterkeyhint="send" size="75">
                     </div>
                 </div>
-                
-                <ul class="list-group">
-                ${el.taskList.map((el) => renderTaskList(el)).join("")}
-                </ul>
-                <ul class="list-group drag-group mt-2">
-                    <li class="list-group-item drag-group-item" ondrop="drop(event)" ondragover="allowDrop(event)" value="${el.id}">
-                        Drop task here
-                    </li>
-                </ul>
             </div>
-        `
-    });
-    $(`#date-list-container`).append(tempHtml);
+            <ul class="list-group">
+                ${tasksMarkup}
+            </ul>
+            <ul class="list-group drag-group mt-2">
+                <li class="list-group-item drag-group-item" ondrop="drop(event)" ondragover="allowDrop(event)" value="${dateItem.id}">
+                    Drop task here
+                </li>
+            </ul>
+        </div>`;
 }
 
-//render the date list navigation
-function renderDateNav(data) {
-    $('#date-list-nav-container').empty();
-    let prevYear;
-    let yearHTML = data.map(function (year) {
-        let tempDate = new Date(year.id);
-        let tempYear = tempDate.getFullYear();
-        if (prevYear != tempYear) {
-            let prevMonth;
-            let monthHTML = data.map(function (month) {
-                let tempDate = new Date(month.id);
-                let tempMonthName = tempDate.toLocaleString('default', { month: 'long' });
-                let tempMonth = tempDate.getMonth();
-                if (prevMonth != tempMonth) {
-                    let dayHTML = data.map(function (date) {
-                        let tempDate = new Date(date.id);
-                        let today = new Date().toLocaleDateString('fr-CA'); //converts time to YYYY-MM-DD
-                        let active = today === date.id ? true : false;
-                        if (tempMonth === tempDate.getMonth()) {
+/**
+ * Build the HTML for a single task list item.
+ * @param {{id: string, name: string, statusCode: number, desc: string}} task
+ * @returns {string}
+ */
+function buildTaskHTML(task) {
+    const isTodo = task.statusCode === STATUS_TODO;
+    const completedClass = isTodo ? '' : 'completed-task';
+    const checkIcon = isTodo ? 'fa-circle' : 'fa-circle-check';
+    const checkLabel = isTodo ? 'Mark As Complete' : 'Move to To-Do';
+    const hasNotes = task.desc && task.desc.length > 1;
 
-                            return dayItem(date, active)
-                        }
-                    });
-                    prevMonth = tempMonth;
-                    return monthYearNavItem(month.id, tempMonthName, dayHTML, 2);
-                }
-
-            });
-            prevYear = tempYear;
-            return monthYearNavItem(year.id, tempYear, monthHTML, 0);
-        }
-    });
-
-    $(`#date-list-nav-container`).append(yearHTML);
-}
-
-function dayItem(el, active) {
     return `
-            <div class="d-flex align-items-center border-start ms-2 py-1">
-                <a class="btn btn-lite-sm btn-no-bg text-start ms-2 ${active ? `btn-no-bg-gray-active` : ''}" href="#date-item-${el.id}">${el.name} <span class="text-body-tertiary"> (${renderTaskListCount(el.taskList)}/${el.taskList.length}) ${renderTaskListCount(el.taskList) != el.taskList.length ? `<span class="text-danger ms-1">⬤</span>` : ''}</span></a>
-            </div>`
-}
-
-function monthYearNavItem(id, name, html, offset) {
-    return `<div>
-    <a class="btn btn-lite-sm btn-no-bg ms-${offset}" href="#date-item-${id}"">${name}</a>
-    ${html.join('')}
-    </div>`
-}
-
-//function to count completed vs incomplete tasks
-function renderTaskListCount(taskList) {
-    let count = 0;
-    taskList.forEach(el => {
-        if (el.statusCode == 1004) {
-            count++;
-        }
-    });
-    return count;
-}
-
-//label & add task button
-// <label for="todo-input-${el.id}">Create task</label>
-{/* <button type="button" class="btn btn-sm btn-no-bg-gray ms-3 todo-task-submit" style="border: none;">
-                            <i class="fa-solid fa-plus"></i>
-                        </button> */}
-
-//function to render the task list HTML
-function renderTaskList(el) {
-    return `
-    <li class="list-group-item d-flex align-items-center justify-content-between ${el.statusCode == 1001 ? '' : 'completed-task'}" draggable="true" ondragstart="drag(event)" value="${el.id}" statuscode="${el.statusCode}">
-    <div class="task-name-container w-100">
-        <button type="button" class="btn btn-sm btn-no-bg todo-task-check" value="${el.id}" statusCode="${el.statusCode}">
-            <i class="fa-solid ${el.statusCode == 1001 ? 'fa-circle' : 'fa-circle-check'}"></i>
-            <span class="btn-title">${el.statusCode == 1001 ? 'Mark As Complete' : 'Move to To-Do'}</span>
-        </button>
-        <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail ${el.desc && el.desc.length > 1 ? 'text-primary' : ''}" value="${el.id}">
-                <i class="fa-solid fa-up-right-from-square"></i>
-                <span class="btn-title">View</span>
-        </button>
-    <span class="task-name w-75">${el.name}</span>
-    </div>
-        <div class="d-flex">
-            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${el.id}">
-                <i class="fa-solid fa-pencil"></i>
-                <span class="btn-title">Edit</span>
-            </button>
-            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${el.id}">
-                <i class="fa-solid fa-trash"></i>
-                <span class="btn-title">Delete</span>
-            </button>
-        </div>
-    </li>
-    `
-}
-
-// --------- Task Notes Detail View -------------
-
-function renderTaskDetailHTML(el) {
-    return `
-    <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
-            <div class="d-flex flex-column task-detail-title w-100">
-                <h5 class="offcanvas-title">${el.name}</h5>
-                <p class="tasks-summary mb-0">${el.dateName}</p>
+        <li class="list-group-item d-flex align-items-center justify-content-between ${completedClass}"
+            draggable="true" ondragstart="drag(event)" value="${task.id}" statuscode="${task.statusCode}">
+            <div class="task-name-container w-100">
+                <button type="button" class="btn btn-sm btn-no-bg todo-task-check" value="${task.id}" statusCode="${task.statusCode}">
+                    <i class="fa-solid ${checkIcon}"></i>
+                    <span class="btn-title">${checkLabel}</span>
+                </button>
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail ${hasNotes ? 'text-primary' : ''}" value="${task.id}">
+                    <i class="fa-solid fa-up-right-from-square"></i>
+                    <span class="btn-title">View</span>
+                </button>
+                <span class="task-name w-75">${task.name}</span>
             </div>
             <div class="d-flex">
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${el.id}">
-                <i class="fa-solid fa-pencil"></i>
-                <span class="btn-title">Edit</span>
-            </button>
-            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${el.id}">
-                <i class="fa-solid fa-trash"></i>
-                <span class="btn-title">Delete</span>
-            </button>
-            <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2" data-bs-dismiss="offcanvas" aria-label="Close">
-                <i class="fa-solid fa-xmark"></i>
-                <span class="btn-title">Close</span>
-            </button>
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${task.id}">
+                    <i class="fa-solid fa-pencil"></i>
+                    <span class="btn-title">Edit</span>
+                </button>
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${task.id}">
+                    <i class="fa-solid fa-trash"></i>
+                    <span class="btn-title">Delete</span>
+                </button>
+            </div>
+        </li>`;
+}
+
+// ─── Differential Rendering — Date Nav ───────────────────────
+
+/**
+ * Render the left-hand date navigation panel.
+ * Uses single-pass year→month→day grouping instead of O(n³) nested maps.
+ * @param {Array} dateLists
+ */
+function renderDateNav(dateLists) {
+    const sorted = sortByDate(dateLists).reverse();
+    const todayStr = new Date().toLocaleDateString('fr-CA'); // "YYYY-MM-DD"
+
+    // Single-pass: group by year → month
+    const yearGroups = new Map();
+
+    for (const dateItem of sorted) {
+        const dateObj = new Date(dateItem.id);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth();
+        const monthName = dateObj.toLocaleString('default', { month: 'long' });
+
+        if (!yearGroups.has(year)) {
+            yearGroups.set(year, new Map());
+        }
+        const monthGroups = yearGroups.get(year);
+
+        if (!monthGroups.has(month)) {
+            monthGroups.set(month, { name: monthName, days: [] });
+        }
+        monthGroups.get(month).days.push(dateItem);
+    }
+
+    // Build nav HTML from grouped data
+    const navParts = [];
+    for (const [year, monthGroups] of yearGroups) {
+        const monthParts = [];
+        for (const [, { name: monthName, days }] of monthGroups) {
+            const dayParts = days.map((dateItem) => {
+                const isToday = dateItem.id === todayStr;
+                return buildNavDayItem(dateItem, isToday);
+            });
+
+            const firstDayId = days[0].id;
+            monthParts.push(`<div>
+                <a class="btn btn-lite-sm btn-no-bg ms-2" href="#date-item-${firstDayId}">${monthName}</a>
+                ${dayParts.join('')}
+            </div>`);
+        }
+
+        const firstMonthDays = [...monthGroups.values()][0].days;
+        navParts.push(`<div>
+            <a class="btn btn-lite-sm btn-no-bg ms-0" href="#date-item-${firstMonthDays[0].id}">${year}</a>
+            ${monthParts.join('')}
+        </div>`);
+    }
+
+    const container = document.getElementById('date-list-nav-container');
+    container.innerHTML = navParts.join('');
+}
+
+/**
+ * Build HTML for a single day entry in the nav sidebar.
+ * @param {{id: string, name: string, taskList: Array}} dateItem
+ * @param {boolean} isToday
+ * @returns {string}
+ */
+function buildNavDayItem(dateItem, isToday) {
+    const completed = countCompletedTasks(dateItem.taskList);
+    const total = dateItem.taskList.length;
+    const incomplete = completed !== total;
+
+    return `
+        <div class="d-flex align-items-center border-start ms-2 py-1">
+            <a class="btn btn-lite-sm btn-no-bg text-start ms-2 ${isToday ? 'btn-no-bg-gray-active' : ''}"
+               href="#date-item-${dateItem.id}">
+                ${dateItem.name}
+                <span class="text-body-tertiary">
+                    (${completed}/${total})${incomplete ? '<span class="text-danger ms-1">⬤</span>' : ''}
+                </span>
+            </a>
+        </div>`;
+}
+
+// ─── Task Detail View ────────────────────────────────────────
+
+/**
+ * Build the offcanvas detail view HTML for a task.
+ * @param {{id: string, name: string, desc: string, dateName: string}} task
+ * @returns {string}
+ */
+function renderTaskDetailHTML(task) {
+    return `
+        <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
+            <div class="d-flex flex-column task-detail-title w-100">
+                <h5 class="offcanvas-title">${task.name}</h5>
+                <p class="tasks-summary mb-0">${task.dateName}</p>
+            </div>
+            <div class="d-flex">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${task.id}">
+                    <i class="fa-solid fa-pencil"></i>
+                    <span class="btn-title">Edit</span>
+                </button>
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${task.id}">
+                    <i class="fa-solid fa-trash"></i>
+                    <span class="btn-title">Delete</span>
+                </button>
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2" data-bs-dismiss="offcanvas" aria-label="Close">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span class="btn-title">Close</span>
+                </button>
             </div>
         </div>
-    <div id="task-detail-body" class="offcanvas-body">
-        ${createRTFToolbar()}
-        <div id="task-notes-area-parent">
-            <section id="task-notes-area" contenteditable="true" value="${el.id}">
-                ${el.desc}
-            </section>
-        </div>
-    </div>
-    `
+        <div id="task-detail-body" class="offcanvas-body">
+            ${createRTFToolbar()}
+            <div id="task-notes-area-parent">
+                <section id="task-notes-area" contenteditable="true" value="${task.id}">
+                    ${task.desc}
+                </section>
+            </div>
+        </div>`;
 }
 
-//status dropdown
-/* <select class="form-select task-status" aria-label="Change Task Status" value="${el.id}">
-            <option selected>${checkStatus(el.statusCode)}</option>
-            ${renderStatus(el.statusCode)}
-         </select> */
+// ─── CRUD Operations ─────────────────────────────────────────
 
-
-function renderStatus(el) {
-    let tempHTML = '';
-    for (let i = 1001; i < 1006; i++) {
-        if (i != el) {
-            tempHTML += `<option value="1">${checkStatus(i)}</option>`
-        }
-    }
-    return tempHTML;
-}
-
-function checkStatus(el) {
-    // 1001 - To-do
-    // 1002 - Ongoing
-    // 1003 - Blocked
-    // 1004 - Completed
-    // 1005 - Archived
-    switch (el) {
-        case 1001:
-            return 'To-Do'
-            break;
-        case 1002:
-            return 'Ongoing'
-            break;
-        case 1003:
-            return 'Blocked'
-            break;
-        case 1004:
-            return 'Completed'
-            break;
-        case 1005:
-            return 'Archived'
-            break;
-
-        default:
-            break;
-    }
-}
-
-
-//function to delete date list
-async function deleteDateList(dateID) {
+/**
+ * Delete a date list from Firestore.
+ * @param {string} dateId
+ */
+async function deleteDateList(dateId) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
     try {
-        await TodoService.deleteDateList(user.uid, dateID);
+        await TodoService.deleteDateList(user.uid, dateId);
         setMessageState('success', 'Date list deleted successfully!');
-    } catch (e) {
+    } catch (error) {
+        console.error("deleteDateList — failed:", error);
         setMessageState('failure', 'Error deleting date list');
     }
 }
 
-
-//Function to create tasks
-async function createTask(taskName, dateID, el, desc, statusCode) {
+/**
+ * Create a new task under a date list.
+ * @param {string} taskName
+ * @param {string} dateId
+ * @param {HTMLElement|null} inputElement - the input to re-focus after creation
+ * @param {string} desc
+ * @param {number} [statusCode=1001]
+ */
+async function createTask(taskName, dateId, inputElement, desc, statusCode) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
@@ -355,44 +451,56 @@ async function createTask(taskName, dateID, el, desc, statusCode) {
         return;
     }
 
-    let milliseconds = Date.now();
-
     const newTask = {
-        id: 'Task-' + dateID + "-" + milliseconds,
+        id: `Task-${dateId}-${Date.now()}`,
         name: replaceURLs(taskName),
-        statusCode: statusCode ? statusCode : 1001,
-        desc: desc ? desc : ''
+        statusCode: statusCode || STATUS_TODO,
+        desc: desc || '',
     };
 
     try {
-        await TodoService.addTask(user.uid, dateID, newTask);
+        await TodoService.addTask(user.uid, dateId, newTask);
         setMessageState('success', 'Task created successfully!');
-        //refocus the create task input
-        let tempID = $(el).attr('id');
-        $(`#${tempID}`).focus();
-    } catch (e) {
+        // Clear and re-focus the input field so the user can keep adding tasks
+        if (inputElement) {
+            $(inputElement).val('').focus();
+        }
+    } catch (error) {
+        console.error("createTask — failed:", error);
         setMessageState('failure', 'Error creating task');
     }
 }
 
-//function to delete tasks
-async function deleteTasks(dateID, taskID) {
+/**
+ * Delete a single task from a date list.
+ * @param {string} dateId
+ * @param {string} taskId - suffix portion of the full task ID
+ * @returns {Promise<boolean>} true if deleted successfully
+ */
+async function deleteTasks(dateId, taskId) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
     try {
-        await TodoService.deleteTask(user.uid, dateID, taskID);
-        setMessageState('success', 'Task Deleted Successfully!');
+        await TodoService.deleteTask(user.uid, dateId, taskId);
+        setMessageState('success', 'Task deleted successfully!');
         return true;
-    } catch (e) {
+    } catch (error) {
+        console.error("deleteTasks — failed:", error);
         setMessageState('failure', 'Error deleting task');
         return false;
     }
 }
 
-
-//function to update tasks
-async function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails) {
+/**
+ * Update a single task's name, status, or description.
+ * @param {string} dateId
+ * @param {string} taskId - suffix portion of the full task ID
+ * @param {string} taskName - new name (or '' to skip)
+ * @param {number|string} taskStatusCode - new status (or '' to skip)
+ * @param {boolean|string} taskDetails - true to save notes area HTML
+ */
+async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
@@ -402,148 +510,202 @@ async function updateTasks(dateID, taskID, taskName, taskStatusCode, taskDetails
     if (taskDetails === true) updates.desc = replaceURLs($('#task-notes-area').html());
 
     try {
-        await TodoService.updateTask(user.uid, dateID, taskID, updates);
-        setMessageState('success', 'Task Updated Successfully!');
-        let newObj = findTask(dateID, taskID);
-        //update the task detail container with fresh HTML
+        await TodoService.updateTask(user.uid, dateId, taskId, updates);
+        setMessageState('success', 'Task updated successfully!');
+        const taskObj = findTask(dateId, taskId);
+        // Refresh the detail view with updated data
         $('#task-detail-container').empty();
-        $('#task-detail-container').append(renderTaskDetailHTML(newObj));
-    } catch (e) {
+        $('#task-detail-container').append(renderTaskDetailHTML(taskObj));
+    } catch (error) {
+        console.error("updateTasks — failed:", error);
         setMessageState('failure', 'Error updating task');
     }
 }
 
-//find task using IDs
-function findTask(dateID, taskID) {
-    let tempTask = '';
-    let tempDateName = '';
-    taskArray.find(el => {
-        if (el.id === dateID) {
-            tempDateName = el.name;
-            el.taskList.find(el => {
-                if (el.id.slice(16) === taskID) {
-                    tempTask = el;
+/**
+ * Find a task object within taskArray by dateId and taskId suffix.
+ * @param {string} dateId
+ * @param {string} taskId
+ * @returns {{id: string, name: string, statusCode: number, desc: string, dateName: string}}
+ */
+function findTask(dateId, taskId) {
+    let foundTask = null;
+    let dateName = '';
+
+    for (const dateItem of taskArray) {
+        if (dateItem.id === dateId) {
+            dateName = dateItem.name;
+            for (const task of dateItem.taskList) {
+                if (task.id.slice(16) === taskId) {
+                    foundTask = task;
+                    break;
                 }
-            });
+            }
+            break;
         }
-    });
-    tempTask.dateName = tempDateName;
-    return tempTask;
+    }
+
+    if (foundTask) {
+        foundTask.dateName = dateName;
+    }
+    return foundTask;
 }
 
+// ─── Date List Creation ──────────────────────────────────────
 
-
-//initialize the storage
-// Expose functions to window for legacy scripts and HTML attributes
-window.createTask = createTask;
-window.deleteTasks = deleteTasks;
-window.updateTasks = updateTasks;
-window.deleteDateList = deleteDateList;
-window.findTask = findTask;
-window.setMessageState = setMessageState;
-window.renderTaskDetailHTML = renderTaskDetailHTML; // Used in listeners.js
-window.getSelectedList = getSelectedList;
-window.deleteSelectedList = deleteSelectedList;
-window.doneSelectedList = doneSelectedList;
-
-
-// New helper for creating date list from listeners.js
-window.createDateList = async function (dateId, dateName) {
+/**
+ * Create a new empty date list in Firestore.
+ * @param {string} dateId - "YYYY-MM-DD"
+ * @param {string} dateName - human-readable date name
+ */
+async function createDateList(dateId, dateName) {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
     try {
-        // Check if it already exists to avoid overwriting tasks
         const existing = await TodoService.getDateList(user.uid, dateId);
         if (existing) {
-            console.log("Date list already exists:", existing);
             setMessageState('success', 'Date list already exists.');
-            return; // Do nothing if it exists
+            return;
         }
 
         const newDateList = {
             id: dateId,
             name: dateName,
             taskList: [],
-            statusCode: 1001
+            statusCode: STATUS_TODO,
         };
 
         await TodoService.saveDateList(user.uid, newDateList);
         setMessageState('success', 'Date list successfully created!');
-    } catch (e) {
-        console.error(e);
+    } catch (error) {
+        console.error("createDateList — failed:", error);
         setMessageState('failure', 'Error creating date list');
     }
-};
+}
 
-//initialize the storage
-// initDB(); // Removed in favor of initApp()
+// ─── Multi-Select & Bulk Operations ─────────────────────────
 
-// function to get selected list of tasks
+/**
+ * Gather all Ctrl+click-selected task items.
+ * @returns {Array<{dateId: string, taskId: string, statusCode: string}>}
+ */
 function getSelectedList() {
-    let selectedList = [];
+    const selected = [];
     $('.list-group-item-selected').each(function () {
-        let dateID = $(this).attr('value').slice(5, 15);
-        let taskID = $(this).attr('value').slice(16);
-        let statusCode = $(this).attr('statuscode');
-        selectedList.push({ dateID, taskID, statusCode });
+        const value = $(this).attr('value');
+        selected.push({
+            dateId: value.slice(5, 15),
+            taskId: value.slice(16),
+            statusCode: $(this).attr('statuscode'),
+        });
     });
-    return selectedList;
+    return selected;
 }
 
-// function to delete selected list of tasks
+/**
+ * Batch-delete all selected tasks, grouped by date list for efficiency.
+ */
 async function deleteSelectedList() {
-    let selectedList = getSelectedList();
-    for (const item of selectedList) {
-        try {
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
 
-            const result = await deleteTasks(item.dateID, item.taskID);
-            if (result) {
-                console.log("Continuing");
-                continue;
-            }
-        } catch (error) {
-            console.error('An error occurred:', error);
+    $('#context-menu').hide();
 
-        }
+    const selected = getSelectedList();
+    if (!selected.length) return;
+
+    // Group by dateId for batch operations
+    const grouped = new Map();
+    for (const { dateId, taskId } of selected) {
+        if (!grouped.has(dateId)) grouped.set(dateId, []);
+        grouped.get(dateId).push(taskId);
     }
-    console.log('Loop finished')
+
+    try {
+        for (const [dateId, taskIds] of grouped) {
+            await TodoService.batchDeleteTasks(user.uid, dateId, taskIds);
+        }
+        setMessageState('success', `Deleted ${selected.length} task(s) successfully!`);
+    } catch (error) {
+        console.error("deleteSelectedList — failed:", error);
+        setMessageState('failure', 'Error deleting selected tasks');
+    }
+
+    $('.list-group-item-selected').removeClass('list-group-item-selected');
 }
 
-// function to mark selected list of tasks as done/undone
+/**
+ * Batch-toggle done/undone for all selected tasks, grouped by date list.
+ */
 async function doneSelectedList() {
-    let selectedList = getSelectedList();
-    for (const item of selectedList) {
-        try {
-            let newStatusCode = item.statusCode == 1001 ? 1004 : 1001;
-            const result = await updateTasks(item.dateID, item.taskID, '', newStatusCode, '');
-            if (result) {
-                console.log("Continuing");
-                continue;
-            }
-        } catch (error) {
-            console.error('An error occurred:', error);
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
 
-        }
+    $('#context-menu').hide();
+
+    const selected = getSelectedList();
+    if (!selected.length) return;
+
+    // Group by dateId for batch operations
+    const grouped = new Map();
+    for (const { dateId, taskId, statusCode } of selected) {
+        if (!grouped.has(dateId)) grouped.set(dateId, []);
+        const newStatus = Number(statusCode) === STATUS_TODO ? STATUS_COMPLETED : STATUS_TODO;
+        grouped.get(dateId).push({ taskId, updates: { statusCode: newStatus } });
     }
-    console.log('Loop finished')
+
+    try {
+        for (const [dateId, taskUpdates] of grouped) {
+            await TodoService.batchUpdateTasks(user.uid, dateId, taskUpdates);
+        }
+        setMessageState('success', `Updated ${selected.length} task(s) successfully!`);
+    } catch (error) {
+        console.error("doneSelectedList — failed:", error);
+        setMessageState('failure', 'Error updating selected tasks');
+    }
+
+    $('.list-group-item-selected').removeClass('list-group-item-selected');
 }
 
-// function to mark all tasks in a date list as done
+/**
+ * Mark all incomplete tasks in a date list as completed (single Firestore write).
+ * @param {string} dateId
+ */
 async function markAllAsDone(dateId) {
-    const dateList = taskArray.find(d => d.id === dateId);
+    const user = getCurrentUser();
+    if (!user) return alert("Please login first");
+
+    const dateList = taskArray.find((dl) => dl.id === dateId);
     if (!dateList) return;
-    
-    for (const task of dateList.taskList) {
-        if (task.statusCode !== 1004) {
-            try {
-                await updateTasks(dateId, task.id.slice(16), '', 1004, '');
-            } catch (error) {
-                console.error('Error marking task as done:', error);
-            }
-        }
+
+    // Collect tasks that are not yet completed
+    const taskUpdates = dateList.taskList
+        .filter((task) => task.statusCode !== STATUS_COMPLETED)
+        .map((task) => ({ taskId: task.id.slice(16), updates: { statusCode: STATUS_COMPLETED } }));
+
+    if (!taskUpdates.length) return;
+
+    try {
+        await TodoService.batchUpdateTasks(user.uid, dateId, taskUpdates);
+        setMessageState('success', `Marked ${taskUpdates.length} task(s) as completed!`);
+    } catch (error) {
+        console.error("markAllAsDone — failed:", error);
+        setMessageState('failure', 'Error marking tasks as completed');
     }
 }
 
-window.markAllAsDone = markAllAsDone;
+// ─── Window Exports (for legacy non-module scripts) ──────────
 
+window.createTask = createTask;
+window.deleteTasks = deleteTasks;
+window.updateTasks = updateTasks;
+window.deleteDateList = deleteDateList;
+window.findTask = findTask;
+window.setMessageState = setMessageState;
+window.renderTaskDetailHTML = renderTaskDetailHTML;
+window.getSelectedList = getSelectedList;
+window.deleteSelectedList = deleteSelectedList;
+window.doneSelectedList = doneSelectedList;
+window.markAllAsDone = markAllAsDone;
+window.createDateList = createDateList;
