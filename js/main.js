@@ -5,6 +5,12 @@
 import { initAuth, getCurrentUser } from "./auth.js";
 import { TodoService } from "./todo-service.js";
 import { hasLocalData, getLocalTasks, migrateData } from "./migration.js";
+import { replaceURLs, escapeHTML, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
+import { sortByDate, createRTFToolbar } from "./notes-common.js";
+
+// ─── Globals (formerly in todo-variables.js) ─────────────────
+let taskArray = [];
+const bsOffcanvas = new bootstrap.Offcanvas('#task-detail-container');
 
 /** Firestore snapshot unsubscribe handle */
 let unsubscribe;
@@ -48,10 +54,10 @@ function initApp() {
         if (await hasLocalData()) {
             const migrated = await migrateData(user.uid);
             if (migrated) {
-                const successDiv = $('#success-message');
-                successDiv.html('<strong>Success!</strong> Migration complete! Your data is now in the cloud.');
-                successDiv.show();
-                setTimeout(() => successDiv.fadeOut(), 5000);
+                const successDiv = document.getElementById('success-message');
+                successDiv.innerHTML = '<strong>Success!</strong> Migration complete! Your data is now in the cloud.';
+                successDiv.style.display = '';
+                setTimeout(() => { successDiv.style.display = 'none'; }, 5000);
             }
         }
 
@@ -60,7 +66,7 @@ function initApp() {
             debouncedRender(dateLists);
         });
 
-        $('#failure-message').hide();
+        document.getElementById('failure-message').style.display = 'none';
 
     }, async () => {
         console.log("User logged out");
@@ -96,13 +102,14 @@ function debouncedRender(dateLists) {
 
 /** Show migration warning banner with login link. */
 function showMigrationWarning() {
-    const alertDiv = $('#failure-message');
-    if (alertDiv.length) {
-        alertDiv.removeClass('alert-danger').addClass('alert-warning');
-        alertDiv.html('<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.');
-        alertDiv.show();
+    const alertDiv = document.getElementById('failure-message');
+    if (alertDiv) {
+        alertDiv.classList.remove('alert-danger');
+        alertDiv.classList.add('alert-warning');
+        alertDiv.innerHTML = '<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.';
+        alertDiv.style.display = '';
 
-        $('#migration-login-link').off('click').on('click', (event) => {
+        document.getElementById('migration-login-link')?.addEventListener('click', (event) => {
             event.preventDefault();
             document.getElementById('login-btn').click();
         });
@@ -120,10 +127,11 @@ initApp();
  * @param {string} message
  */
 function setMessageState(type, message) {
-    const messageEl = $(`#${type}-message`);
-    messageEl.text(message);
-    messageEl.show();
-    setTimeout(() => messageEl.hide(), 4000);
+    const messageEl = document.getElementById(`${type}-message`);
+    if (!messageEl) return;
+    messageEl.textContent = message;
+    messageEl.style.display = 'block';
+    setTimeout(() => { messageEl.style.display = 'none'; }, 4000);
 }
 
 /**
@@ -145,6 +153,26 @@ function getStatusLabel(statusCode) {
 }
 
 // ─── Differential Rendering — Date Lists ─────────────────────
+
+/**
+ * Fast shallow comparison of two date-list objects.
+ * Avoids full JSON.stringify by comparing task count, names, statuses, and descriptions.
+ * @param {Object} prev - previous date-list snapshot
+ * @param {Object} curr - current date-list snapshot
+ * @returns {boolean} true if the date list has changed
+ */
+function dateListChanged(prev, curr) {
+    if (prev.name !== curr.name) return true;
+    const pTasks = prev.taskList;
+    const cTasks = curr.taskList;
+    if (pTasks.length !== cTasks.length) return true;
+    for (let i = 0; i < cTasks.length; i++) {
+        const p = pTasks[i];
+        const c = cTasks[i];
+        if (p.id !== c.id || p.name !== c.name || p.statusCode !== c.statusCode || p.desc !== c.desc) return true;
+    }
+    return false;
+}
 
 /**
  * Render the main date-list view. Uses differential updates:
@@ -169,7 +197,7 @@ function renderDateList(dateLists) {
     // Add or update each date list
     for (const dateItem of taskArray) {
         const previousData = previousDateListMap.get(dateItem.id);
-        const hasChanged = !previousData || JSON.stringify(previousData) !== JSON.stringify(dateItem);
+        const hasChanged = !previousData || dateListChanged(previousData, dateItem);
 
         if (hasChanged) {
             const existingEl = document.getElementById(`date-item-${dateItem.id}`);
@@ -220,24 +248,24 @@ function buildDateListHTML(dateItem) {
 
     return `
         <div id="date-item-${dateItem.id}" class="mb-4 p-3 date-item">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="d-flex align-items-start">
-                    <div class="d-grid">
-                        <h4 class="mb-1">${dateItem.name}</h4>
-                        <div class="d-flex align-items-center mb-2">
+            <div class="flex justify-between items-start">
+                <div class="flex items-start">
+                    <div class="grid">
+                        <h4 class="mb-1">${escapeHTML(dateItem.name)}</h4>
+                        <div class="flex items-center mb-2">
                             <p class="tasks-summary mb-0">${completedCount} tasks completed out of ${totalCount}</p>
-                            <button type="button" class="btn btn-sm btn-no-bg-gray ms-1 mark-all-done-btn" value="${dateItem.id}">
+                            <button type="button" class="btn btn-sm btn-no-bg-gray ml-1 mark-all-done-btn" value="${dateItem.id}">
                                 <i class="fa-${checkIconClass}"></i>
                                 <span class="btn-title">Mark All As Complete</span>
                             </button>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-no-bg-gray ms-2 todo-date-delete" value="${dateItem.id}">
+                    <button type="button" class="btn btn-sm btn-no-bg-gray ml-2 todo-date-delete" value="${dateItem.id}">
                         <i class="fa-solid fa-trash"></i>
                         <span class="btn-title">Delete Date List</span>
                     </button>
                 </div>
-                <div class="d-flex">
+                <div class="flex">
                     <div class="todo-input-form">
                         <input type="text" class="form-control create-task-input" id="todo-input-${dateItem.id}" placeholder="Add Task"
                             enterkeyhint="send" size="75">
@@ -248,7 +276,7 @@ function buildDateListHTML(dateItem) {
                 ${tasksMarkup}
             </ul>
             <ul class="list-group drag-group mt-2">
-                <li class="list-group-item drag-group-item" ondrop="drop(event)" ondragover="allowDrop(event)" value="${dateItem.id}">
+                <li class="list-group-item drag-group-item" value="${dateItem.id}">
                     Drop task here
                 </li>
             </ul>
@@ -268,25 +296,25 @@ function buildTaskHTML(task) {
     const hasNotes = task.desc && task.desc.length > 1;
 
     return `
-        <li class="list-group-item d-flex align-items-center justify-content-between ${completedClass}"
-            draggable="true" ondragstart="drag(event)" value="${task.id}" statuscode="${task.statusCode}">
-            <div class="task-name-container w-100">
+        <li class="list-group-item flex items-center justify-between ${completedClass}"
+            draggable="true" value="${task.id}" statuscode="${task.statusCode}">
+            <div class="task-name-container w-full">
                 <button type="button" class="btn btn-sm btn-no-bg todo-task-check" value="${task.id}" statusCode="${task.statusCode}">
                     <i class="fa-solid ${checkIcon}"></i>
                     <span class="btn-title">${checkLabel}</span>
                 </button>
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray me-2 todo-task-detail ${hasNotes ? 'text-primary' : ''}" value="${task.id}">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray mr-2 todo-task-detail ${hasNotes ? 'text-primary' : ''}" value="${task.id}">
                     <i class="fa-solid fa-up-right-from-square"></i>
                     <span class="btn-title">View</span>
                 </button>
-                <span class="task-name w-75">${task.name}</span>
+                <span class="task-name w-3/4">${escapeHTML(task.name)}</span>
             </div>
-            <div class="d-flex">
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${task.id}">
+            <div class="flex">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-edit" value="${task.id}">
                     <i class="fa-solid fa-pencil"></i>
                     <span class="btn-title">Edit</span>
                 </button>
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${task.id}">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-delete" value="${task.id}">
                     <i class="fa-solid fa-trash"></i>
                     <span class="btn-title">Delete</span>
                 </button>
@@ -299,9 +327,16 @@ function buildTaskHTML(task) {
 /**
  * Render the left-hand date navigation panel.
  * Uses single-pass year→month→day grouping instead of O(n³) nested maps.
+ * Skips re-render when the nav-relevant data (IDs + task counts) hasn't changed.
  * @param {Array} dateLists
  */
+let _prevNavFingerprint = '';
 function renderDateNav(dateLists) {
+    // Quick fingerprint: id + completed/total for each date list
+    const fingerprint = dateLists.map(d => `${d.id}:${countCompletedTasks(d.taskList)}/${d.taskList.length}`).join('|');
+    if (fingerprint === _prevNavFingerprint) return;
+    _prevNavFingerprint = fingerprint;
+
     const sorted = sortByDate(dateLists).reverse();
     const todayStr = new Date().toLocaleDateString('fr-CA'); // "YYYY-MM-DD"
 
@@ -336,15 +371,15 @@ function renderDateNav(dateLists) {
             });
 
             const firstDayId = days[0].id;
-            monthParts.push(`<div>
-                <a class="btn btn-lite-sm btn-no-bg ms-2" href="#date-item-${firstDayId}">${monthName}</a>
+            monthParts.push(`<div class="ml-1 mt-1">
+                <a class="nav-sidebar-heading" href="#date-item-${firstDayId}">${monthName}</a>
                 ${dayParts.join('')}
             </div>`);
         }
 
         const firstMonthDays = [...monthGroups.values()][0].days;
-        navParts.push(`<div>
-            <a class="btn btn-lite-sm btn-no-bg ms-0" href="#date-item-${firstMonthDays[0].id}">${year}</a>
+        navParts.push(`<div class="mb-2">
+            <a class="nav-sidebar-year" href="#date-item-${firstMonthDays[0].id}">${year}</a>
             ${monthParts.join('')}
         </div>`);
     }
@@ -365,12 +400,12 @@ function buildNavDayItem(dateItem, isToday) {
     const incomplete = completed !== total;
 
     return `
-        <div class="d-flex align-items-center border-start ms-2 py-1">
-            <a class="btn btn-lite-sm btn-no-bg text-start ms-2 ${isToday ? 'btn-no-bg-gray-active' : ''}"
+        <div class="flex items-center border-l border-slate-700 ml-1">
+            <a class="nav-sidebar-day ${isToday ? 'btn-no-bg-gray-active' : ''}"
                href="#date-item-${dateItem.id}">
                 ${dateItem.name}
-                <span class="text-body-tertiary">
-                    (${completed}/${total})${incomplete ? '<span class="text-danger ms-1">⬤</span>' : ''}
+                <span class="nav-sidebar-count">
+                    (${completed}/${total})${incomplete ? '<span class="nav-sidebar-dot">⬤</span>' : ''}
                 </span>
             </a>
         </div>`;
@@ -385,21 +420,21 @@ function buildNavDayItem(dateItem, isToday) {
  */
 function renderTaskDetailHTML(task) {
     return `
-        <div id="task-detail-title-container" class="offcanvas-header border-bottom justify-content-between">
-            <div class="d-flex flex-column task-detail-title w-100">
-                <h5 class="offcanvas-title">${task.name}</h5>
-                <p class="tasks-summary mb-0">${task.dateName}</p>
+        <div id="task-detail-title-container" class="offcanvas-header border-b justify-between">
+            <div class="flex flex-col task-detail-title w-full">
+                <h5 class="offcanvas-title">${escapeHTML(task.name)}</h5>
+                <p class="tasks-summary mb-0">${escapeHTML(task.dateName || '')}</p>
             </div>
-            <div class="d-flex">
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-edit" value="${task.id}">
+            <div class="flex">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-edit" value="${task.id}">
                     <i class="fa-solid fa-pencil"></i>
                     <span class="btn-title">Edit</span>
                 </button>
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2 todo-task-delete" value="${task.id}">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-delete" value="${task.id}">
                     <i class="fa-solid fa-trash"></i>
                     <span class="btn-title">Delete</span>
                 </button>
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ms-2" data-bs-dismiss="offcanvas" aria-label="Close">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2" data-bs-dismiss="offcanvas" aria-label="Close">
                     <i class="fa-solid fa-xmark"></i>
                     <span class="btn-title">Close</span>
                 </button>
@@ -463,7 +498,8 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode) {
         setMessageState('success', 'Task created successfully!');
         // Clear and re-focus the input field so the user can keep adding tasks
         if (inputElement) {
-            $(inputElement).val('').focus();
+            inputElement.value = '';
+            inputElement.focus();
         }
     } catch (error) {
         console.error("createTask — failed:", error);
@@ -507,15 +543,18 @@ async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails
     const updates = {};
     if (taskName !== '') updates.name = replaceURLs(taskName);
     if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
-    if (taskDetails === true) updates.desc = replaceURLs($('#task-notes-area').html());
+    if (taskDetails === true) {
+        const notesArea = document.getElementById('task-notes-area');
+        updates.desc = replaceURLs(notesArea ? notesArea.innerHTML : '');
+    }
 
     try {
         await TodoService.updateTask(user.uid, dateId, taskId, updates);
         setMessageState('success', 'Task updated successfully!');
         const taskObj = findTask(dateId, taskId);
         // Refresh the detail view with updated data
-        $('#task-detail-container').empty();
-        $('#task-detail-container').append(renderTaskDetailHTML(taskObj));
+        const detailContainer = document.getElementById('task-detail-container');
+        detailContainer.innerHTML = renderTaskDetailHTML(taskObj);
     } catch (error) {
         console.error("updateTasks — failed:", error);
         setMessageState('failure', 'Error updating task');
@@ -536,7 +575,7 @@ function findTask(dateId, taskId) {
         if (dateItem.id === dateId) {
             dateName = dateItem.name;
             for (const task of dateItem.taskList) {
-                if (task.id.slice(16) === taskId) {
+                if (task.id.slice(TASK_ID_OFFSET) === taskId) {
                     foundTask = task;
                     break;
                 }
@@ -592,12 +631,12 @@ async function createDateList(dateId, dateName) {
  */
 function getSelectedList() {
     const selected = [];
-    $('.list-group-item-selected').each(function () {
-        const value = $(this).attr('value');
+    document.querySelectorAll('.list-group-item-selected').forEach((el) => {
+        const value = el.getAttribute('value');
         selected.push({
-            dateId: value.slice(5, 15),
-            taskId: value.slice(16),
-            statusCode: $(this).attr('statuscode'),
+            dateId: value.slice(DATE_ID_START, DATE_ID_END),
+            taskId: value.slice(TASK_ID_OFFSET),
+            statusCode: el.getAttribute('statuscode'),
         });
     });
     return selected;
@@ -610,7 +649,7 @@ async function deleteSelectedList() {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
-    $('#context-menu').hide();
+    document.getElementById('context-menu').style.display = 'none';
 
     const selected = getSelectedList();
     if (!selected.length) return;
@@ -632,7 +671,7 @@ async function deleteSelectedList() {
         setMessageState('failure', 'Error deleting selected tasks');
     }
 
-    $('.list-group-item-selected').removeClass('list-group-item-selected');
+    document.querySelectorAll('.list-group-item-selected').forEach(el => el.classList.remove('list-group-item-selected'));
 }
 
 /**
@@ -642,7 +681,7 @@ async function doneSelectedList() {
     const user = getCurrentUser();
     if (!user) return alert("Please login first");
 
-    $('#context-menu').hide();
+    document.getElementById('context-menu').style.display = 'none';
 
     const selected = getSelectedList();
     if (!selected.length) return;
@@ -665,7 +704,7 @@ async function doneSelectedList() {
         setMessageState('failure', 'Error updating selected tasks');
     }
 
-    $('.list-group-item-selected').removeClass('list-group-item-selected');
+    document.querySelectorAll('.list-group-item-selected').forEach(el => el.classList.remove('list-group-item-selected'));
 }
 
 /**
@@ -682,7 +721,7 @@ async function markAllAsDone(dateId) {
     // Collect tasks that are not yet completed
     const taskUpdates = dateList.taskList
         .filter((task) => task.statusCode !== STATUS_COMPLETED)
-        .map((task) => ({ taskId: task.id.slice(16), updates: { statusCode: STATUS_COMPLETED } }));
+        .map((task) => ({ taskId: task.id.slice(TASK_ID_OFFSET), updates: { statusCode: STATUS_COMPLETED } }));
 
     if (!taskUpdates.length) return;
 
@@ -695,17 +734,23 @@ async function markAllAsDone(dateId) {
     }
 }
 
-// ─── Window Exports (for legacy non-module scripts) ──────────
+// ─── Exports ─────────────────────────────────────────────────
 
-window.createTask = createTask;
-window.deleteTasks = deleteTasks;
-window.updateTasks = updateTasks;
-window.deleteDateList = deleteDateList;
-window.findTask = findTask;
-window.setMessageState = setMessageState;
-window.renderTaskDetailHTML = renderTaskDetailHTML;
-window.getSelectedList = getSelectedList;
-window.deleteSelectedList = deleteSelectedList;
-window.doneSelectedList = doneSelectedList;
-window.markAllAsDone = markAllAsDone;
-window.createDateList = createDateList;
+export {
+    taskArray,
+    bsOffcanvas,
+    STATUS_TODO,
+    STATUS_COMPLETED,
+    createTask,
+    deleteTasks,
+    updateTasks,
+    deleteDateList,
+    findTask,
+    setMessageState,
+    renderTaskDetailHTML,
+    getSelectedList,
+    deleteSelectedList,
+    doneSelectedList,
+    markAllAsDone,
+    createDateList,
+};

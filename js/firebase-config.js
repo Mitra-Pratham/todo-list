@@ -3,7 +3,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// TODO: Replace the following with your app's Firebase project configuration
+// Firebase API key is intentionally public — access is restricted by
+// Firebase Security Rules and domain allow-listing, not by key secrecy.
 // See: https://firebase.google.com/docs/web/learn-more#config-object
 const firebaseConfig = {
   apiKey: "AIzaSyCNUQvXxM7hVQXwGD3gzHRBucgPatVKszU",

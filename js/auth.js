@@ -35,25 +35,34 @@ export async function logout() {
     }
 }
 
-// Auth State Listener
+/**
+ * Initialise Firebase auth state listener.
+ * Toggles login/profile UI and invokes callbacks on auth changes.
+ * @param {Function} onLogin - called with the Firebase User on sign-in
+ * @param {Function} onLogout - called (no args) on sign-out
+ */
 export function initAuth(onLogin, onLogout) {
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
-            if (loginButton) loginButton.classList.add("d-none");
-            if (userProfile) userProfile.classList.remove("d-none");
+            if (loginButton) loginButton.classList.add("hidden");
+            if (userProfile) userProfile.classList.remove("hidden");
             if (userNameDisplay) userNameDisplay.textContent = user.displayName;
             if (onLogin) onLogin(user);
         } else {
             currentUser = null;
-            if (loginButton) loginButton.classList.remove("d-none");
-            if (userProfile) userProfile.classList.add("d-none");
+            if (loginButton) loginButton.classList.remove("hidden");
+            if (userProfile) userProfile.classList.add("hidden");
             if (userNameDisplay) userNameDisplay.textContent = "";
             if (onLogout) onLogout();
         }
     });
 }
 
+/**
+ * Return the currently authenticated Firebase user, or null.
+ * @returns {import('firebase/auth').User|null}
+ */
 export function getCurrentUser() {
     return currentUser;
 }

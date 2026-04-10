@@ -37,7 +37,7 @@ const colorsArray = [
 ];
 
 /** Reusable CSS class string for small toolbar buttons */
-const commonButtonClasses = 'btn btn-lite-sm btn-no-bg-gray';
+export const commonButtonClasses = 'btn btn-lite-sm btn-no-bg-gray';
 
 /**
  * Sort an array of objects by their `.id` property (date string) in ascending order.
@@ -46,15 +46,15 @@ const commonButtonClasses = 'btn btn-lite-sm btn-no-bg-gray';
  * @param {Array<{id: string}>} items - Array with date-string IDs (e.g. "2026-04-06")
  * @returns {Array<{id: string}>} Sorted copy of the array
  */
-function sortByDate(items) {
-    return [...items].sort((a, b) => new Date(a.id) - new Date(b.id));
+export function sortByDate(items) {
+    return [...items].sort((a, b) => Date.parse(a.id) - Date.parse(b.id));
 }
 
 /**
  * Build HTML for the keyboard-shortcut help panel.
  * @returns {string} HTML string of shortcut rows
  */
-function createShortcuts() {
+export function createShortcuts() {
     return shortcutKeys
         .map((shortcut) => `<div class="mb-1">${shortcut.name}: <b>${shortcut.keys}</b></div>`)
         .join('');
@@ -66,23 +66,26 @@ function createShortcuts() {
  * @param {boolean} [showSwatch=false] - If true, render a colour swatch instead of text label
  * @returns {string} HTML string of buttons
  */
-function createButtons(items, showSwatch = false) {
+export function createButtons(items, showSwatch = false) {
     const renderSwatch = (value) =>
-        `<div value="${value}" style="border:1px solid #ddd; border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`;
+        `<div value="${value}" style="border:1px solid var(--border-dark); border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`;
 
     return items
         .map((item) =>
-            `<button class="btn btn-lite-sm btn-no-bg d-flex" value="${item.value}">
+            `<button class="btn btn-lite-sm btn-no-bg flex" value="${item.value}">
                 ${showSwatch ? renderSwatch(item.value) : item.name}<span class="btn-title">${item.name}</span></button>`)
         .join('');
 }
 
 /**
  * Build the full Rich-Text-Formatting toolbar HTML used in task-detail and notes views.
+ * Cached after first call to avoid redundant string construction.
  * @returns {string} HTML string for the toolbar
  */
-function createRTFToolbar() {
-    return `
+let _cachedToolbarHTML = null;
+export function createRTFToolbar() {
+    if (_cachedToolbarHTML) return _cachedToolbarHTML;
+    _cachedToolbarHTML = `
         <div id="notes-formatter-row">
                 <div id="rtf-buttons">
                     <button class="${commonButtonClasses} headings-box">
@@ -123,7 +126,7 @@ function createRTFToolbar() {
                     <i class="fa-solid fa-keyboard"></i>
                     </button>
                     <div id="shortcuts-box-container" class="task-box-ui-layout">
-                    <div class="fw-bold mb-2">Shortcuts</div>
+                    <div class="font-bold mb-2">Shortcuts</div>
                         ${createShortcuts()}
                     </div>
 
@@ -131,4 +134,5 @@ function createRTFToolbar() {
                 <div id="saved-box-message" class="toaster-message">Your notes have been saved</div>
             </div>
     `;
+    return _cachedToolbarHTML;
 }

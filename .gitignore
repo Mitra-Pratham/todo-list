@@ -1,2 +1,5 @@
 # MCP server (not part of the GitHub Pages site)
 mcp-server/
+node_modules/
+package-lock.json
+package.json

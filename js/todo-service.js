@@ -3,6 +3,7 @@
 // ============================================================
 
 import { db } from "./firebase-config.js";
+import { TASK_ID_OFFSET } from "./utils.js";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 /** Firestore sub-collection name for to-do date lists */
@@ -271,7 +272,7 @@ export const TodoService = {
             const dateList = docSnap.data();
             const idsToRemove = new Set(taskIds);
             dateList.taskList = dateList.taskList.filter((t) => {
-                const suffix = t.id.slice(16);
+                const suffix = t.id.slice(TASK_ID_OFFSET);
                 return !idsToRemove.has(suffix);
             });
 

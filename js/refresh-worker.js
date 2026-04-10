@@ -17,7 +17,8 @@ window.addEventListener('load', () => {
     localStorage.setItem(LAST_VISIT_KEY, nowMs);
 
     const todayISO = new Date().toISOString().split('T')[0];
-    $('#todo-date-input').val(todayISO);
+    const dateInput = document.getElementById('todo-date-input');
+    if (dateInput) dateInput.value = todayISO;
 });
 
 /**

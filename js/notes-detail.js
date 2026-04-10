@@ -6,12 +6,15 @@ import { TodoService } from "./todo-service.js";
 import { auth } from "./firebase-config.js";
 import { initAuth, getCurrentUser } from "./auth.js";
 import { migrateData, getLocalNotes } from "./migration.js";
+import { replaceURLs, escapeHTML } from "./utils.js";
+import { createRTFToolbar } from "./notes-common.js";
 
 /** Reusable CSS class string for small toolbar buttons */
 const TOOLBAR_BTN_CLASSES = 'btn btn-lite-sm btn-no-bg-gray';
 
-/** Reference to the shared RTF toolbar builder (loaded via <script> before this module) */
-const createRTFToolbar = window.createRTFToolbar;
+// ─── Globals (formerly in notes-variables.js) ────────────────
+let notesArray = [];
+const pageDefaultID = 'notes-area-0000001';
 
 /** Default HTML for a brand-new note page */
 const DEFAULT_NOTE_HTML = '<div id="sections-area-default" class="sections-area"><h2>Welcome to Notes!</h2></div>';
@@ -24,14 +27,17 @@ const DEFAULT_NOTE_ID = 'notes-area-0000001';
 /** Bootstrap the notes page: set up auth listeners and Firestore subscription. */
 function initApp() {
     const onLogin = async (user) => {
-        $('#failure-message').hide();
+        const failureMsg = document.getElementById('failure-message');
+        if (failureMsg) failureMsg.style.display = 'none';
 
         // Migrate local IndexedDB notes to Firestore if present
         if (await migrateData(user.uid)) {
-            const successDiv = $('#success-message');
-            successDiv.html('<strong>Success!</strong> Migration complete! Your data is now in the cloud.');
-            successDiv.show();
-            setTimeout(() => successDiv.fadeOut(), 5000);
+            const successDiv = document.getElementById('success-message');
+            if (successDiv) {
+                successDiv.innerHTML = '<strong>Success!</strong> Migration complete! Your data is now in the cloud.';
+                successDiv.style.display = 'block';
+                setTimeout(() => { successDiv.style.display = 'none'; }, 5000);
+            }
         }
 
         // Subscribe to real-time notes updates
@@ -51,7 +57,8 @@ function initApp() {
             }
 
             // Determine which page to display
-            const activePageId = $('#notes-detail-area').attr('value');
+            const editorEl = document.getElementById('notes-detail-area');
+            const activePageId = editorEl?.getAttribute('value');
             let pageToShow = notesArray.find((n) => n.id === activePageId);
 
             if (!pageToShow) {
@@ -62,8 +69,9 @@ function initApp() {
                 createPageTabs(notesArray, pageToShow.id);
 
                 // Avoid overwriting content while the user is actively editing
-                const isFocused = $('#notes-detail-area').is(':focus');
-                if (!isFocused || $('#notes-detail-area').attr('value') !== pageToShow.id) {
+                const editorNow = document.getElementById('notes-detail-area');
+                const isFocused = document.activeElement === editorNow;
+                if (!isFocused || editorNow?.getAttribute('value') !== pageToShow.id) {
                     renderNotesDetailHTML(pageToShow);
                 }
             }
@@ -71,15 +79,10 @@ function initApp() {
     };
 
     const onLogout = async () => {
-        $('#failure-message').hide();
+        const failureMsgOut = document.getElementById('failure-message');
+        if (failureMsgOut) failureMsgOut.style.display = 'none';
 
         try {
-            // Ensure the RTF toolbar function is available
-            if (typeof createRTFToolbar !== 'function' && typeof window.createRTFToolbar !== 'function') {
-                console.error('notes-detail.js — createRTFToolbar is not defined, using fallback.');
-                window.createRTFToolbar = () => '<div class="alert alert-danger">Toolbar error</div>';
-            }
-
             const localNotes = await getLocalNotes();
             notesArray = localNotes;
 
@@ -92,13 +95,14 @@ function initApp() {
                 }];
             } else {
                 // Show migration warning if local data exists
-                const alertDiv = $('#failure-message');
-                if (alertDiv.length) {
-                    alertDiv.removeClass('alert-danger').addClass('alert-warning');
-                    alertDiv.html('<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.');
-                    alertDiv.show();
+                const alertDiv = document.getElementById('failure-message');
+                if (alertDiv) {
+                    alertDiv.classList.remove('alert-danger');
+                    alertDiv.classList.add('alert-warning');
+                    alertDiv.innerHTML = '<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.';
+                    alertDiv.style.display = 'block';
 
-                    $('#migration-login-link').off('click').on('click', (event) => {
+                    document.getElementById('migration-login-link')?.addEventListener('click', (event) => {
                         event.preventDefault();
                         document.getElementById('login-btn').click();
                     });
@@ -106,7 +110,8 @@ function initApp() {
             }
 
             // Render the first available page
-            const activePageId = $('#notes-detail-area').attr('value');
+            const editorLogout = document.getElementById('notes-detail-area');
+            const activePageId = editorLogout?.getAttribute('value');
             const pageToShow = notesArray.find((n) => n.id === activePageId) || notesArray[0];
 
             if (pageToShow) {
@@ -119,8 +124,10 @@ function initApp() {
         } catch (error) {
             console.error('notes-detail.js — logout local-data flow failed:', error);
             notesArray = [];
-            $('#notes-detail-container').empty();
-            $('#notes-detail-pages-tab-container').empty();
+            const dc = document.getElementById('notes-detail-container');
+            if (dc) dc.innerHTML = '';
+            const tc = document.getElementById('notes-detail-pages-tab-container');
+            if (tc) tc.innerHTML = '';
         }
     };
 
@@ -131,8 +138,11 @@ function initApp() {
 
 /** Flash the "saved" toaster message for 3 seconds. */
 function showSavedToaster() {
-    $('#saved-box-message').show();
-    setTimeout(() => $('#saved-box-message').hide(), 3000);
+    const toaster = document.getElementById('saved-box-message');
+    if (toaster) {
+        toaster.style.display = '';
+        setTimeout(() => { toaster.style.display = 'none'; }, 3000);
+    }
 }
 
 /**
@@ -155,7 +165,8 @@ function saveSingleNoteToDB(note) {
  * @param {{id: string, name: string, html: string}} page
  */
 function renderNotesDetailHTML(page) {
-    $('#notes-detail-title').text(page.name);
+    const titleEl = document.getElementById('notes-detail-title');
+    if (titleEl) titleEl.textContent = page.name;
 
     const detailHTML = `
         <div id="notes-detail-title-container">
@@ -181,7 +192,8 @@ function renderNotesDetailHTML(page) {
             </div>
         </div>`;
 
-    $('#notes-detail-container').empty().append(detailHTML);
+    const detailContainerEl = document.getElementById('notes-detail-container');
+    if (detailContainerEl) detailContainerEl.innerHTML = detailHTML;
     createPageTabs(notesArray, page.id);
     createSections();
 }
@@ -195,13 +207,14 @@ function createSections() {
 
     for (let i = 0; i < sectionElements.length; i++) {
         const sectionId = sectionElements[i].id;
-        const sectionTitle = $('.sections-area h2').eq(i).text();
+        const h2El = sectionElements[i].querySelector('h2');
+        const sectionTitle = h2El ? h2El.textContent : '';
         const isHidden = sectionElements[i].style.display === 'none';
 
         sectionToggles.push(`
-            <div class="btn btn-lite-sm btn-no-bg d-flex align-items-center justify-content-between text-start"
+            <div class="btn btn-lite-sm btn-no-bg flex items-center justify-between text-left"
                  tabindex="0" value="${sectionId}" index="${i}">
-                ${sectionTitle}
+                ${escapeHTML(sectionTitle)}
                 <div>
                     <button class="${TOOLBAR_BTN_CLASSES} hide-section ${isHidden ? 'section-hidden' : ''}">
                         <i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i>
@@ -211,7 +224,7 @@ function createSections() {
     }
 
     const addButtonsHTML = `
-        <div class="notes-area-section-toggle-heading-container d-flex align-items-center justify-content-between">
+        <div class="notes-area-section-toggle-heading-container flex items-center justify-between">
             <h6>Sections</h6>
             <div class="notes-area-section-toggle-heading-icons">
                 <button class="${TOOLBAR_BTN_CLASSES} add-sections-box" value="up">
@@ -225,9 +238,10 @@ function createSections() {
             </div>
         </div>`;
 
-    const container = $('.notes-detail-section-toggle-container');
-    container.empty().append(sectionToggles);
-    container.prepend(addButtonsHTML);
+    const container = document.querySelector('.notes-detail-section-toggle-container');
+    if (container) {
+        container.innerHTML = addButtonsHTML + sectionToggles.join('');
+    }
 }
 
 /**
@@ -235,14 +249,16 @@ function createSections() {
  * @param {'up'|'down'} position
  */
 function addSections(position) {
-    const pageId = $('#notes-detail-area').attr('value');
+    const editor = document.getElementById('notes-detail-area');
+    if (!editor) return;
+    const pageId = editor.getAttribute('value');
     const sectionId = `sections-area-${Date.now()}`;
     const sectionHTML = `<div id="${sectionId}" class="sections-area"><h2>New Section</h2></div>`;
 
     if (position === 'up') {
-        $('#notes-detail-area').prepend(sectionHTML);
+        editor.insertAdjacentHTML('afterbegin', sectionHTML);
     } else {
-        $('#notes-detail-area').append(sectionHTML);
+        editor.insertAdjacentHTML('beforeend', sectionHTML);
     }
 
     saveText(pageId, true, false);
@@ -256,7 +272,8 @@ function addSections(position) {
  * @param {string} [importedName] - pre-filled name (for imports)
  */
 function createPage(importedHTML, importedName) {
-    const pageName = importedName || prompt('Enter page name', `Page ${$('.page-tab').length + 1}`);
+    const pageCount = document.querySelectorAll('.page-tab').length;
+    const pageName = importedName || prompt('Enter page name', `Page ${pageCount + 1}`);
     if (pageName === null) return;
 
     const newPageId = `notes-area-${Date.now()}`;
@@ -283,22 +300,23 @@ function createPageTabs(pages, activePageId) {
         const isActive = activePageId === page.id ? 'btn-no-bg-gray-active' : '';
         const deleteButton = page.id === pageDefaultID
             ? ''
-            : `<button class="${TOOLBAR_BTN_CLASSES} d-flex delete-page">Delete</button>`;
+            : `<button class="${TOOLBAR_BTN_CLASSES} flex delete-page">Delete</button>`;
 
         return `
-            <div class="position-relative d-flex align-items-center">
-                <button id="${page.id}" class="${TOOLBAR_BTN_CLASSES} d-flex page-tab ${isActive}">
-                    ${page.name}
+            <div class="relative flex items-center">
+                <button id="${page.id}" class="${TOOLBAR_BTN_CLASSES} flex page-tab ${isActive}">
+                    ${escapeHTML(page.name)}
                 </button>
                 <div value="${page.id}" class="task-box-ui-layout">
-                    <button class="${TOOLBAR_BTN_CLASSES} d-flex rename-page">Rename</button>
-                    <button class="${TOOLBAR_BTN_CLASSES} d-flex export-page">Export</button>
+                    <button class="${TOOLBAR_BTN_CLASSES} flex rename-page">Rename</button>
+                    <button class="${TOOLBAR_BTN_CLASSES} flex export-page">Export</button>
                     ${deleteButton}
                 </div>
             </div>`;
     });
 
-    $('#notes-detail-pages-tab-container').empty().append(tabsHTML);
+    const tabContainer = document.getElementById('notes-detail-pages-tab-container');
+    if (tabContainer) tabContainer.innerHTML = tabsHTML.join('');
 }
 
 /**
@@ -309,7 +327,7 @@ function deletePage(pageId) {
     const confirmed = confirm('Are you sure you want to delete this page?');
     if (!confirmed) return;
 
-    const activeTabId = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
+    const activeTabId = document.querySelector('#notes-detail-pages-tab-container .btn-no-bg-gray-active')?.id;
     const fallbackId = activeTabId === pageId ? pageDefaultID : activeTabId;
 
     notesArray = notesArray.filter((page) => page.id !== pageId);
@@ -343,7 +361,8 @@ function findPage(pageId) {
  * @param {string|false} newName - new page name, or false to keep current
  */
 function saveText(pageId, shouldSaveHTML, newName) {
-    const editorHTML = replaceURLs($('#notes-detail-area').html());
+    const editor = document.getElementById('notes-detail-area');
+    const editorHTML = replaceURLs(editor ? editor.innerHTML : '');
 
     notesArray = notesArray.map((page) => {
         if (page.id !== pageId) return page;
@@ -362,19 +381,21 @@ function saveText(pageId, shouldSaveHTML, newName) {
 
     // Refresh tabs if the page was renamed
     if (newName !== false) {
-        const activeTabId = $('#notes-detail-pages-tab-container .btn-no-bg-gray-active').attr('id');
-        createPageTabs(notesArray, activeTabId);
+        const activeTab = document.querySelector('#notes-detail-pages-tab-container .btn-no-bg-gray-active');
+        createPageTabs(notesArray, activeTab?.id);
     }
 }
 
-// ─── Window Exports (for non-module listener scripts) ────────
+// ─── Exports ─────────────────────────────────────────────────
 
-window.createPage = createPage;
-window.deletePage = deletePage;
-window.saveText = saveText;
-window.addSections = addSections;
-window.findPage = findPage;
-window.renderNotesDetailHTML = renderNotesDetailHTML;
+export {
+    createPage,
+    deletePage,
+    saveText,
+    addSections,
+    findPage,
+    renderNotesDetailHTML,
+};
 
 // Boot the notes page
 initApp();

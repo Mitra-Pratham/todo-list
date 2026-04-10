@@ -6,6 +6,13 @@ const TASKS_STORE_NAME = 'tasksData';
 const NOTES_DB_NAME = 'NotesDB';
 const NOTES_STORE_NAME = 'notesData';
 
+/**
+ * Read all records from an IndexedDB object store.
+ * Resolves with an empty array if the DB or store does not exist.
+ * @param {string} dbName - IndexedDB database name
+ * @param {string} storeName - object store name
+ * @returns {Promise<Array>} all records in the store
+ */
 export function getIndexedDBData(dbName, storeName) {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(dbName);
@@ -44,16 +51,19 @@ export function getIndexedDBData(dbName, storeName) {
     });
 }
 
+/** Check whether any local IndexedDB data exists (tasks or notes). @returns {Promise<boolean>} */
 export async function hasLocalData() {
     const tasks = await getIndexedDBData(TASKS_DB_NAME, TASKS_STORE_NAME);
     const notes = await getIndexedDBData(NOTES_DB_NAME, NOTES_STORE_NAME);
     return tasks.length > 0 || notes.length > 0;
 }
 
+/** Retrieve all task records from the local IndexedDB. @returns {Promise<Array>} */
 export async function getLocalTasks() {
     return await getIndexedDBData(TASKS_DB_NAME, TASKS_STORE_NAME);
 }
 
+/** Retrieve all note records from the local IndexedDB. @returns {Promise<Array>} */
 export async function getLocalNotes() {
     return await getIndexedDBData(NOTES_DB_NAME, NOTES_STORE_NAME);
 }
@@ -116,6 +126,12 @@ async function migrateNotes(userId) {
     console.log(`Migrated ${notes.length} notes.`);
 }
 
+/**
+ * Migrate all local IndexedDB data (tasks + notes) to Firestore.
+ * No-ops if migration was already performed (tracked via localStorage flag).
+ * @param {string} userId - Firebase UID
+ * @returns {Promise<boolean>} true on success, false on failure
+ */
 export async function migrateData(userId) {
     if (localStorage.getItem(MIGRATION_KEY) === 'true') {
         console.log('Migration already performed.');
@@ -156,6 +172,7 @@ function deleteDatabase(dbName) {
     });
 }
 
+/** Delete local IndexedDB databases for tasks and notes. */
 export async function clearLocalData() {
     try {
         await deleteDatabase(TASKS_DB_NAME);

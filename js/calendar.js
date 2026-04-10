@@ -2,6 +2,9 @@
 // calendar.js — FullCalendar integration for the todo list app
 // ============================================================
 
+import { taskArray, bsOffcanvas, findTask, renderTaskDetailHTML } from "./main.js";
+import { TASK_ID_OFFSET } from "./utils.js";
+
 /** Main FullCalendar instance */
 let calendar = null;
 
@@ -54,7 +57,7 @@ function initCalendar() {
             const startTime = info.event.start
                 ? new Date(info.event.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
                 : '';
-            $(info.el).append(`<span class="btn-title">${startTime} ${info.event.title}</span>`);
+            info.el.insertAdjacentHTML('beforeend', `<span class="btn-title">${startTime} ${info.event.title}</span>`);
         },
 
         datesSet: (info) => {
@@ -182,17 +185,17 @@ function toggleCalendarView() {
     isCalendarView = !isCalendarView;
 
     if (isCalendarView) {
-        dateContainer.classList.add('d-none');
-        calendarContainer.classList.remove('d-none');
-        toggleBtn.innerHTML = '<i class="fa-solid fa-list me-2"></i>List View';
+        dateContainer.classList.add('hidden');
+        calendarContainer.classList.remove('hidden');
+        toggleBtn.classList.add('active');
 
         if (!calendar) initCalendar();
         updateCalendarEvents(taskArray);
         calendar.updateSize();
     } else {
-        dateContainer.classList.remove('d-none');
-        calendarContainer.classList.add('d-none');
-        toggleBtn.innerHTML = '<i class="fa-solid fa-calendar-days me-2"></i>Calendar';
+        dateContainer.classList.remove('hidden');
+        calendarContainer.classList.add('hidden');
+        toggleBtn.classList.remove('active');
     }
 }
 
@@ -203,9 +206,10 @@ function toggleCalendarView() {
  */
 function openTaskDetail(dateId, taskId) {
     try {
-        const task = window.findTask(dateId, taskId.slice(16));
+        const task = findTask(dateId, taskId.slice(TASK_ID_OFFSET));
         if (task) {
-            $('#task-detail-container').empty().append(window.renderTaskDetailHTML(task));
+            const detailEl = document.getElementById('task-detail-container');
+            detailEl.innerHTML = renderTaskDetailHTML(task);
             bsOffcanvas.show();
         }
     } catch (error) {
@@ -230,7 +234,6 @@ function scrollToDateList(dateStr) {
 // Bind the toggle button
 document.getElementById('calendar-toggle-btn').addEventListener('click', toggleCalendarView);
 
-// ─── Window Exports ──────────────────────────────────────────
+// ─── Exports ─────────────────────────────────────────────────
 
-window.updateCalendarEvents = updateCalendarEvents;
-window.isCalendarView = () => isCalendarView;
+export { updateCalendarEvents, isCalendarView };

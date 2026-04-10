@@ -2,11 +2,14 @@
 // drag.js — Drag-and-drop handlers for moving tasks between dates
 // ============================================================
 
+import { createTask, deleteTasks, findTask } from "./main.js";
+import { DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
+
 /**
  * Allow a drop target to receive dragged items.
  * @param {DragEvent} event
  */
-function allowDrop(event) {
+export function allowDrop(event) {
     event.preventDefault();
 }
 
@@ -14,11 +17,11 @@ function allowDrop(event) {
  * Start dragging a task item — serialise its ID into the dataTransfer.
  * @param {DragEvent} event
  */
-function drag(event) {
+export function drag(event) {
     try {
-        const dragPayload = { value: $(event.target).attr('value') };
+        const dragPayload = { value: event.target.getAttribute('value') };
         event.dataTransfer.setData('text', JSON.stringify(dragPayload));
-        $('.drag-group').show();
+        document.querySelectorAll('.drag-group').forEach(el => el.style.display = '');
     } catch (error) {
         console.error('drag.js — drag start failed:', error);
     }
@@ -30,7 +33,7 @@ function drag(event) {
  * and re-creates it under the target date.
  * @param {DragEvent} event
  */
-function drop(event) {
+export function drop(event) {
     event.preventDefault();
 
     try {
@@ -38,9 +41,9 @@ function drop(event) {
         if (!rawData) return;
 
         const dragPayload = JSON.parse(rawData);
-        const sourceTaskId = dragPayload.value.slice(16);
-        const sourceDateId = dragPayload.value.slice(5, 15);
-        const targetDateId = $(event.target).attr('value');
+        const sourceTaskId = dragPayload.value.slice(TASK_ID_OFFSET);
+        const sourceDateId = dragPayload.value.slice(DATE_ID_START, DATE_ID_END);
+        const targetDateId = event.target.getAttribute('value');
 
         // Validate both IDs exist and are the same format (10-char date strings)
         if (!targetDateId || !sourceDateId || targetDateId.length !== sourceDateId.length) return;
@@ -54,5 +57,26 @@ function drop(event) {
         console.error('drag.js — drop handler failed:', error);
     }
 
-    $('.drag-group').hide();
+    document.querySelectorAll('.drag-group').forEach(el => el.style.display = 'none');
+}
+
+// ─── Delegated drag-and-drop listeners ───────────────────────
+
+const dateListContainer = document.getElementById('date-list-container');
+
+if (dateListContainer) {
+    dateListContainer.addEventListener('dragstart', (e) => {
+        const li = e.target.closest('.list-group-item[draggable="true"]');
+        if (li && dateListContainer.contains(li)) drag(e);
+    });
+
+    dateListContainer.addEventListener('dragover', (e) => {
+        const dropZone = e.target.closest('.drag-group-item');
+        if (dropZone && dateListContainer.contains(dropZone)) allowDrop(e);
+    });
+
+    dateListContainer.addEventListener('drop', (e) => {
+        const dropZone = e.target.closest('.drag-group-item');
+        if (dropZone && dateListContainer.contains(dropZone)) drop(e);
+    });
 }

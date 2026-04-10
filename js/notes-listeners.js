@@ -2,29 +2,73 @@
 // notes-listeners.js — Event listeners for the Notes detail page
 // ============================================================
 
-// ─── Auto-Save ───────────────────────────────────────────────
+import {
+    createPage,
+    deletePage,
+    saveText,
+    addSections,
+    findPage,
+    renderNotesDetailHTML,
+} from "./notes-detail.js";
+import { replaceURLs, escapeHTML, isValidURL } from "./utils.js";
 
-// Save notes content when the editor loses focus
-$('#notes-detail-container').on('blur', '#notes-detail-area', function () {
-    const pageId = $('#notes-detail-area').attr('value');
-    saveText(pageId, true, false);
+// ─── Cached DOM references ───────────────────────────────────
+
+const notesContainer = document.getElementById('notes-detail-container');
+
+/**
+ * Attach a delegated event listener to a parent element.
+ * @param {string} eventType
+ * @param {string} selector
+ * @param {Function} handler - receives (event, matchedElement)
+ */
+function delegate(eventType, selector, handler) {
+    notesContainer.addEventListener(eventType, (e) => {
+        const target = e.target.closest(selector);
+        if (target && notesContainer.contains(target)) {
+            handler(e, target);
+        }
+    });
+}
+
+/** Helper: get the notes editor element */
+function getEditor() {
+    return document.getElementById('notes-detail-area');
+}
+
+/** Helper: toggle a toolbar sub-panel */
+function togglePanel(panelId, toggleSelector) {
+    const panel = document.getElementById(panelId);
+    if (panel) panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    document.querySelector(toggleSelector)?.classList.toggle('btn-no-bg-gray-active');
+}
+
+// ─── Auto-Save (debounced) ───────────────────────────────────
+
+let _saveTimer = null;
+// Save notes content when the editor loses focus (debounced 500ms)
+delegate('focusout', '#notes-detail-area', () => {
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+        const editor = getEditor();
+        if (editor) saveText(editor.getAttribute('value'), true, false);
+    }, 500);
 });
 
 // ─── RTF Toolbar Toggles ────────────────────────────────────
 
 // Toggle headings / colours / background pickers
-$('#notes-detail-container').on('mousedown', '.headings-box, .colors-box, .background-box', function (e) {
+delegate('mousedown', '.headings-box', (e) => {
     e.preventDefault();
-    if ($(this).hasClass('headings-box')) {
-        $('.headings-box').toggleClass('btn-no-bg-gray-active');
-        $('#headings-box-container').toggle();
-    } else if ($(this).hasClass('colors-box')) {
-        $('.colors-box').toggleClass('btn-no-bg-gray-active');
-        $('#colors-box-container').toggle();
-    } else if ($(this).hasClass('background-box')) {
-        $('.background-box').toggleClass('btn-no-bg-gray-active');
-        $('#background-box-container').toggle();
-    }
+    togglePanel('headings-box-container', '.headings-box');
+});
+delegate('mousedown', '.colors-box', (e) => {
+    e.preventDefault();
+    togglePanel('colors-box-container', '.colors-box');
+});
+delegate('mousedown', '.background-box', (e) => {
+    e.preventDefault();
+    togglePanel('background-box-container', '.background-box');
 });
 
 // ─── Selection Formatting Helper ─────────────────────────────
@@ -68,74 +112,67 @@ function insertFormattedNode(formatType, value) {
 
 // ─── Heading / Colour / Background Insertion ─────────────────
 
+/** Helper: save + close panel after formatting action */
+function saveAndClosePanel(panelId, toggleSelector) {
+    const editor = getEditor();
+    if (editor) saveText(editor.getAttribute('value'), true, false);
+    const panel = document.getElementById(panelId);
+    if (panel) panel.style.display = 'none';
+    document.querySelector(toggleSelector)?.classList.remove('btn-no-bg-gray-active');
+}
+
 // Insert heading into notes area
-$('#notes-detail-container').on('mousedown', '#headings-box-container button', function (e) {
+delegate('mousedown', '#headings-box-container button', (e, el) => {
     e.preventDefault();
-    const headingTag = $(this).attr('value');
-    const isFocused = $('#notes-detail-area').is(':focus');
+    const headingTag = el.getAttribute('value');
+    const editor = getEditor();
+    const isFocused = document.activeElement === editor;
 
     if (isFocused) {
         insertFormattedNode('heading', headingTag);
-    } else {
-        const headingMarkup = `<${headingTag}>Heading ${headingTag.slice(1, 2)}</${headingTag}>`;
-        $('#notes-detail-area').append(headingMarkup);
+    } else if (editor) {
+        editor.insertAdjacentHTML('beforeend', `<${headingTag}>Heading ${headingTag.slice(1, 2)}</${headingTag}>`);
     }
 
-    const pageId = $('#notes-detail-area').attr('value');
-    saveText(pageId, true, false);
-    $('#headings-box-container').hide();
-    $('.headings-box').removeClass('btn-no-bg-gray-active');
+    saveAndClosePanel('headings-box-container', '.headings-box');
 });
 
 // Apply font colour to selected text
-$('#notes-detail-container').on('mousedown', '#colors-box-container button', function (e) {
+delegate('mousedown', '#colors-box-container button', (e, el) => {
     e.preventDefault();
-    const colorValue = $(this).attr('value');
-    const isFocused = $('#notes-detail-area').is(':focus');
-
-    if (isFocused) {
-        insertFormattedNode('color', colorValue);
+    const editor = getEditor();
+    if (document.activeElement === editor) {
+        insertFormattedNode('color', el.getAttribute('value'));
     }
-
-    const pageId = $('#notes-detail-area').attr('value');
-    saveText(pageId, true, false);
-    $('#colors-box-container').hide();
-    $('.colors-box').removeClass('btn-no-bg-gray-active');
+    saveAndClosePanel('colors-box-container', '.colors-box');
 });
 
 // Apply background colour to selected text
-$('#notes-detail-container').on('mousedown', '#background-box-container button', function (e) {
+delegate('mousedown', '#background-box-container button', (e, el) => {
     e.preventDefault();
-    const bgValue = $(this).attr('value');
-    const isFocused = $('#notes-detail-area').is(':focus');
-
-    if (isFocused) {
-        insertFormattedNode('background', bgValue);
+    const editor = getEditor();
+    if (document.activeElement === editor) {
+        insertFormattedNode('background', el.getAttribute('value'));
     }
-
-    const pageId = $('#notes-detail-area').attr('value');
-    saveText(pageId, true, false);
-    $('#background-box-container').hide();
-    $('.background-box').removeClass('btn-no-bg-gray-active');
+    saveAndClosePanel('background-box-container', '.background-box');
 });
 
 // ─── Sections ────────────────────────────────────────────────
 
 // Add a section above or below the notes area
-$('#notes-detail-container').on('click', '.add-sections-box', function () {
-    const position = $(this).attr('value');
-    addSections(position);
+delegate('click', '.add-sections-box', (e, el) => {
+    addSections(el.getAttribute('value'));
 });
 
 // ─── Page Management ─────────────────────────────────────────
 
 // Create a new page
-$('#notes-detail-container').on('click', '#createPage', () => {
+delegate('click', '#createPage', () => {
     createPage();
 });
 
 // Import a page from a local file
-$('#notes-detail-container').on('click', '#importPage', async function () {
+delegate('click', '#importPage', async () => {
     try {
         const [fileHandle] = await window.showOpenFilePicker();
         const file = await fileHandle.getFile();
@@ -148,33 +185,37 @@ $('#notes-detail-container').on('click', '#importPage', async function () {
 });
 
 // Navigate to a page tab
-$('#notes-detail-container').on('click', '.page-tab', function () {
-    const pageId = $(this).attr('id');
-    const pageObj = findPage(pageId);
+delegate('click', '.page-tab', (e, el) => {
+    const pageObj = findPage(el.id);
     renderNotesDetailHTML(pageObj);
 });
 
 // Right-click context menu for page tabs
-$('#notes-detail-container').on('contextmenu', '.page-tab', function (e) {
+delegate('contextmenu', '.page-tab', (e, el) => {
     e.preventDefault();
-    const menuEl = $(this).next();
-    const isOpen = menuEl.hasClass('section-open');
-    $('.section-open').hide().removeClass('section-open');
-    if (!isOpen) {
-        menuEl.show().addClass('section-open');
+    const menuEl = el.nextElementSibling;
+    const isOpen = menuEl?.classList.contains('section-open');
+    // Close all open menus
+    document.querySelectorAll('.section-open').forEach(m => {
+        m.style.display = 'none';
+        m.classList.remove('section-open');
+    });
+    if (!isOpen && menuEl) {
+        menuEl.style.display = '';
+        menuEl.classList.add('section-open');
     }
 });
 
 // Delete a page
-$('#notes-detail-container').on('click', '.delete-page', function () {
-    const pageId = $(this).parent().attr('value');
+delegate('click', '.delete-page', (e, el) => {
+    const pageId = el.parentElement.getAttribute('value');
     deletePage(pageId);
 });
 
 // Rename a page
-$('#notes-detail-container').on('click', '.rename-page', function () {
-    const pageId = $(this).parent().attr('value');
-    const currentName = $(this).parent().prev().text().trim();
+delegate('click', '.rename-page', (e, el) => {
+    const pageId = el.parentElement.getAttribute('value');
+    const currentName = el.parentElement.previousElementSibling?.textContent.trim() || '';
     const newName = prompt('Rename the page', currentName);
     if (newName !== null) {
         saveText(pageId, false, newName);
@@ -212,15 +253,18 @@ async function writeFile(fileHandle, contents) {
 }
 
 // Export the current page as an HTML file
-$('#notes-detail-container').on('click', '.export-page', function () {
-    const pageId = $(this).parent().attr('value');
+delegate('click', '.export-page', (e, el) => {
+    const pageId = el.parentElement.getAttribute('value');
     const pageObj = findPage(pageId);
-    const pageName = $(this).parent().prev().text().trim();
+    const pageName = el.parentElement.previousElementSibling?.textContent.trim() || '';
 
     getNewFileHandle(pageName)
         .then((handle) => {
             writeFile(handle, pageObj.html);
-            $('.section-open').hide().removeClass('section-open');
+            document.querySelectorAll('.section-open').forEach(m => {
+                m.style.display = 'none';
+                m.classList.remove('section-open');
+            });
         })
         .catch((error) => {
             console.error('notes-listeners.js — export failed:', error);
@@ -229,7 +273,7 @@ $('#notes-detail-container').on('click', '.export-page', function () {
 
 // ─── Notes Keyboard Shortcuts ────────────────────────────────
 
-$('#notes-detail-container').on('keydown', '#notes-detail-area', function (e) {
+delegate('keydown', '#notes-detail-area', (e) => {
     try {
         const selection = window.getSelection();
         const range = selection.getRangeAt(0);
@@ -259,11 +303,13 @@ $('#notes-detail-container').on('keydown', '#notes-detail-area', function (e) {
         if (e.ctrlKey && e.key === 'k') {
             e.preventDefault();
             const linkUrl = prompt('Please enter URL here', 'https://google.com');
-            if (linkUrl) {
+            if (linkUrl && isValidURL(linkUrl)) {
                 const linkWrapper = document.createElement('span');
-                linkWrapper.innerHTML = `<a href="${linkUrl}" target="_blank">${selection.toString()}</a>`;
+                linkWrapper.innerHTML = `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(selection.toString())}</a>`;
                 range.deleteContents();
                 range.insertNode(linkWrapper);
+            } else if (linkUrl) {
+                alert('Invalid URL. Only http and https URLs are allowed.');
             }
         }
 

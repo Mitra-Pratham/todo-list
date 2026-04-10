@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* ─── Theme — One Dark Pro Night Flat ───────────────────────── */
+@theme {
+  --color-primary: #61afef;
+  --color-primary-hover: #4d8fd6;
+  --color-danger: #e06c75;
+  --color-success: #98c379;
+  --color-warning: #e5c07b;
+  --color-surface-dark: #16191d;
+  --color-surface-dark-hover: #2c313a;
+  --color-actbar: #16191d;
+  --color-bg-canvas: #16191d;
+  --color-bg-card: #16191d;
+  --color-border-dark: #3e4452;
+  --color-text-primary: #abb2bf;
+  --color-text-secondary: #9da5b4;
+  --radius-btn: 8px;
+  --radius-card: 12px;
+}
+
+/* ─── Source scanning (so Tailwind picks up classes in JS) ───── */
+@source "../js/**/*.js";
+
+/* ─── Base Layer ─────────────────────────────────────────────── */
+@layer base {
+  html,
+  body {
+    font-family: "Inter", sans-serif;
+    scroll-behavior: smooth;
+    background: var(--color-bg-canvas);
+    color: var(--color-text-primary);
+  }
+}
+
+/* ─── Component Layer ────────────────────────────────────────── */
+@layer components {
+  /* --- Buttons --- */
+  .btn     { @apply relative; }
+  .btn-sm  { @apply px-3 py-1.5 text-sm; }
+  .btn-primary {
+    @apply text-white rounded-btn;
+    background: var(--color-primary);
+  }
+  .btn-primary:hover { background: var(--color-primary-hover); }
+  .btn-outline-danger {
+    @apply border rounded-btn;
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+  }
+  .btn-outline-danger:hover {
+    background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  }
+
+  /* --- Forms --- */
+  .form-control {
+    @apply border rounded-lg px-3 py-1.5 text-sm;
+    background: var(--overlay-hover, rgba(255,255,255,.06));
+    border-color: var(--color-border-dark);
+    color: var(--color-text-primary);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--primary-tint-medium, rgba(99, 102, 241, 0.15));
+  }
+  .form-check       { @apply flex items-center pl-7 mb-2; }
+  .form-check-input { @apply mr-2; accent-color: var(--color-primary); }
+  .form-check-label { @apply flex items-center gap-2 text-sm; }
+
+  /* --- Alerts --- */
+  .alert {
+    @apply p-2 text-xs rounded-lg;
+    display: none;
+  }
+  .alert-success { @apply border; background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 25%, transparent); }
+  .alert-danger  { @apply border; background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 25%, transparent); }
+  .alert-warning { @apply border; background: color-mix(in srgb, var(--color-warning) 12%, transparent); color: var(--color-warning); border-color: color-mix(in srgb, var(--color-warning) 25%, transparent); }
+
+  /* --- List group (used heavily in JS templates) --- */
+  .list-group {
+    @apply flex flex-col;
+  }
+  .list-group-item {
+    @apply px-4 py-2.5;
+    background: var(--color-bg-card);
+    border-bottom: 1px solid var(--color-border-dark);
+    color: var(--color-text-primary);
+    transition: border-color 0.15s;
+  }
+  .list-group-item:first-child { @apply rounded-t-card; }
+  .list-group-item:last-child  { @apply rounded-b-card; border-bottom: none; }
+  .list-group-item:hover { border-color: var(--color-primary); }
+
+  /* --- Offcanvas (Bootstrap JS still active) --- */
+  .offcanvas       { @apply fixed top-0 bottom-0 z-[1045] flex flex-col; background: var(--color-bg-card); box-shadow: -4px 0 24px rgba(0,0,0,0.3); color: var(--color-text-primary); }
+  .offcanvas-end   { @apply right-0; width: 35vw; transform: translateX(100%); transition: transform 0.3s ease-in-out; }
+  .offcanvas.show  { transform: translateX(0); }
+  .offcanvas-header { @apply flex items-center justify-between p-4; border-bottom: 1px solid var(--color-border-dark); }
+  .offcanvas-title  { @apply text-lg font-semibold; }
+  .offcanvas-body   { @apply flex-1 p-4 overflow-auto; }
+
+  /* --- Container --- */
+  .container-fluid { @apply w-full px-4; }
+}
