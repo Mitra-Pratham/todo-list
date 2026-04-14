@@ -9,6 +9,8 @@ import {
     addSections,
     findPage,
     renderNotesDetailHTML,
+    exportNotesJSON,
+    importNotesJSON,
 } from "./notes-detail.js";
 import { replaceURLs, escapeHTML, isValidURL } from "./utils.js";
 
@@ -39,7 +41,7 @@ function getEditor() {
 /** Helper: toggle a toolbar sub-panel */
 function togglePanel(panelId, toggleSelector) {
     const panel = document.getElementById(panelId);
-    if (panel) panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
     document.querySelector(toggleSelector)?.classList.toggle('btn-no-bg-gray-active');
 }
 
@@ -164,6 +166,37 @@ delegate('click', '.add-sections-box', (e, el) => {
     addSections(el.getAttribute('value'));
 });
 
+// Toggle section visibility (eye / eye-slash)
+delegate('click', '.hide-section', (e, el) => {
+    e.stopPropagation();
+    const toggleDiv = el.closest('[value]');
+    const sectionId = toggleDiv?.getAttribute('value');
+    const sectionEl = document.getElementById(sectionId);
+    if (!sectionEl) return;
+
+    const isHidden = sectionEl.style.display === 'none';
+    sectionEl.style.display = isHidden ? '' : 'none';
+
+    // Update the icon
+    const icon = el.querySelector('i');
+    if (icon) {
+        icon.className = isHidden ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+    }
+    el.classList.toggle('section-hidden', !isHidden);
+
+    // Persist the change
+    const editor = getEditor();
+    if (editor) saveText(editor.getAttribute('value'), true, false);
+});
+
+// Click on a section toggle label to scroll to that section
+delegate('click', '.notes-detail-section-toggle-container > [value]', (e, el) => {
+    if (e.target.closest('.hide-section') || e.target.closest('.add-sections-box')) return;
+    const sectionId = el.getAttribute('value');
+    const sectionEl = document.getElementById(sectionId);
+    if (sectionEl) sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 // ─── Page Management ─────────────────────────────────────────
 
 // Create a new page
@@ -201,7 +234,7 @@ delegate('contextmenu', '.page-tab', (e, el) => {
         m.classList.remove('section-open');
     });
     if (!isOpen && menuEl) {
-        menuEl.style.display = '';
+        menuEl.style.display = 'block';
         menuEl.classList.add('section-open');
     }
 });
@@ -325,3 +358,7 @@ delegate('keydown', '#notes-detail-area', (e) => {
         console.error('notes-listeners.js — keydown handler failed:', error);
     }
 });
+
+// Notes JSON Import / Export buttons
+document.getElementById('export-notes-btn')?.addEventListener('click', () => exportNotesJSON());
+document.getElementById('import-notes-btn')?.addEventListener('click', () => importNotesJSON());

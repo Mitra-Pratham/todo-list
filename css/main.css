@@ -1,5 +1,6 @@
 /* ─── Design Tokens — One Dark Pro Night Flat ──────────────── */
 :root {
+  color-scheme: dark;
   --button-radius: 8px;
   --card-radius: 12px;
   --color-primary: #61afef;
@@ -41,6 +42,52 @@
   /* Overlays */
   --overlay-hover: rgba(255,255,255, 0.06);
   --overlay-border: rgba(255,255,255, 0.12);
+  /* Toaster */
+  --toaster-bg: rgba(22, 25, 29, 0.85);
+}
+
+/* ─── Design Tokens — Atom One Light ─────────────────────────── */
+[data-theme="light"] {
+  color-scheme: light;
+  --color-primary: #4078f2;
+  --color-primary-hover: #3066d4;
+  --color-danger: #e45649;
+  --color-success: #50a14f;
+  --color-warning: #c18401;
+  --actbar-bg: #e5e5e6;
+  --actbar-icon: #a0a1a7;
+  --actbar-icon-active: #383a42;
+  --surface-dark: #eaeaeb;
+  --surface-dark-hover: rgba(64,120,242, 0.10);
+  --surface-dark-active: rgba(64,120,242, 0.15);
+  --surface-dark-border: #dbdbdc;
+  --text-on-dark: #383a42;
+  --text-on-dark-muted: #696c77;
+  --bg-canvas: #fafafa;
+  --bg-card: #ffffff;
+  --border-dark: #d0d0d1;
+  --text-primary: #383a42;
+  --text-secondary: #a0a1a7;
+  --link-color: #4078f2;
+  --text-bright: #232324;
+  --text-on-accent: #ffffff;
+  --primary-tint-subtle: rgba(64,120,242, 0.06);
+  --primary-tint: rgba(64,120,242, 0.08);
+  --primary-tint-medium: rgba(64,120,242, 0.15);
+  --primary-tint-strong: rgba(64,120,242, 0.3);
+  --primary-focus-ring: rgba(64,120,242, 0.4);
+  --overlay-hover: rgba(64,120,242, 0.06);
+  --overlay-border: rgba(0,0,0, 0.08);
+  --toaster-bg: rgba(255, 255, 255, 0.85);
+  /* Tailwind @theme variable overrides (--color-* prefix) */
+  --color-surface-dark: #eaeaeb;
+  --color-surface-dark-hover: rgba(64,120,242, 0.10);
+  --color-actbar: #e5e5e6;
+  --color-bg-canvas: #fafafa;
+  --color-bg-card: #ffffff;
+  --color-border-dark: #d0d0d1;
+  --color-text-primary: #383a42;
+  --color-text-secondary: #a0a1a7;
 }
 
 html,
@@ -851,7 +898,7 @@ input:hover {
   color: var(--color-primary);
   font-size: .675rem;
   padding: .3rem .6rem;
-  background-color: rgba(22, 25, 29, 0.85);
+  background-color: var(--toaster-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--primary-tint-medium);
@@ -1170,7 +1217,7 @@ code+div {
   color: var(--text-on-accent) !important;
 }
 .fc-daygrid-event-dot{
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  border-color: var(--overlay-border) !important;
 }
 
 .fc .fc-daygrid-more-link {

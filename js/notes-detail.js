@@ -296,6 +296,67 @@ function saveText(pageId, shouldSaveHTML, newName) {
     }
 }
 
+// ─── JSON Import / Export ────────────────────────────────────
+
+/**
+ * Export all notes pages as a JSON file download.
+ */
+function exportNotesJSON() {
+    const json = JSON.stringify(notesArray, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `notes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Import notes pages from a JSON file, write to IndexedDB, and re-render.
+ */
+function importNotesJSON() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const pages = JSON.parse(text);
+
+            if (!Array.isArray(pages) || pages.length === 0) {
+                console.error('notes-detail.js — importNotesJSON: invalid or empty JSON');
+                return;
+            }
+
+            for (const page of pages) {
+                if (!page.id || !page.name) continue;
+                const note = {
+                    id: page.id,
+                    name: page.name,
+                    status: page.status ?? 1001,
+                    html: page.html ?? '',
+                };
+                await TodoService.saveNote(note);
+            }
+
+            // Refresh UI
+            notesArray = await TodoService.getAllNotes();
+            const pageToShow = notesArray.find((n) => n.id === pageDefaultID) || notesArray[0];
+            if (pageToShow) {
+                renderNotesDetailHTML(pageToShow);
+                createPageTabs(notesArray, pageToShow.id);
+            }
+        } catch (error) {
+            console.error('notes-detail.js — importNotesJSON failed:', error);
+        }
+    });
+    input.click();
+}
+
 // ─── Exports ─────────────────────────────────────────────────
 
 export {
@@ -305,6 +366,8 @@ export {
     addSections,
     findPage,
     renderNotesDetailHTML,
+    exportNotesJSON,
+    importNotesJSON,
 };
 
 // Boot the notes page

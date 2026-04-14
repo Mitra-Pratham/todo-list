@@ -196,7 +196,7 @@ document.addEventListener('click', (e) => {
 // Helper to toggle visibility of a toolbar sub-panel
 function togglePanel(panelId, toggleSelector) {
     const panel = document.getElementById(panelId);
-    if (panel) panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
     document.querySelector(toggleSelector)?.classList.toggle('btn-no-bg-gray-active');
 }
 
