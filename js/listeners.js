@@ -17,6 +17,8 @@ import {
     doneSelectedList,
     markAllAsDone,
     createDateList,
+    exportCSV,
+    importCSV,
     STATUS_TODO,
     STATUS_COMPLETED,
 } from "./main.js";
@@ -358,3 +360,7 @@ function getNotesTaskIds() {
 // Context menu delegated listeners (replaces inline onclick handlers)
 document.getElementById('ctx-done-btn')?.addEventListener('click', () => doneSelectedList());
 document.getElementById('ctx-delete-btn')?.addEventListener('click', () => deleteSelectedList());
+
+// CSV Import / Export buttons
+document.getElementById('export-csv-btn')?.addEventListener('click', () => exportCSV());
+document.getElementById('import-csv-btn')?.addEventListener('click', () => importCSV());

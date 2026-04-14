@@ -2,9 +2,7 @@
 // main.js — App entry point, rendering, and task CRUD operations
 // ============================================================
 
-import { initAuth, getCurrentUser } from "./auth.js";
 import { TodoService } from "./todo-service.js";
-import { hasLocalData, getLocalTasks, migrateData } from "./migration.js";
 import { replaceURLs, escapeHTML, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
 import { sortByDate, createRTFToolbar } from "./notes-common.js";
 
@@ -12,20 +10,11 @@ import { sortByDate, createRTFToolbar } from "./notes-common.js";
 let taskArray = [];
 const bsOffcanvas = new bootstrap.Offcanvas('#task-detail-container');
 
-/** Firestore snapshot unsubscribe handle */
-let unsubscribe;
-
 /**
  * Previous snapshot data keyed by date-list ID, used for differential rendering.
  * @type {Map<string, object>}
  */
 const previousDateListMap = new Map();
-
-/** Debounce timer ID for snapshot-driven rendering */
-let renderDebounceTimer = null;
-
-/** Debounce delay in milliseconds for collapsing rapid Firestore snapshots */
-const RENDER_DEBOUNCE_MS = 100;
 
 // ─── Status Code Constants ───────────────────────────────────
 const STATUS_TODO      = 1001;
@@ -45,75 +34,19 @@ const STATUS_LABELS = {
 
 // ─── App Initialisation ──────────────────────────────────────
 
-/** Bootstrap the app: set up auth listeners and Firestore subscriptions. */
-function initApp() {
-    initAuth(async (user) => {
-        console.log("User logged in");
-
-        // Migrate local IndexedDB data to Firestore if present
-        if (await hasLocalData()) {
-            const migrated = await migrateData(user.uid);
-            if (migrated) {
-                const successDiv = document.getElementById('success-message');
-                successDiv.innerHTML = '<strong>Success!</strong> Migration complete! Your data is now in the cloud.';
-                successDiv.style.display = '';
-                setTimeout(() => { successDiv.style.display = 'none'; }, 5000);
-            }
-        }
-
-        // Subscribe to real-time Firestore updates with debounced rendering
-        unsubscribe = TodoService.subscribe(user.uid, (dateLists) => {
-            debouncedRender(dateLists);
-        });
-
-        document.getElementById('failure-message').style.display = 'none';
-
-    }, async () => {
-        console.log("User logged out");
-        if (unsubscribe) unsubscribe();
-
-        if (await hasLocalData()) {
-            console.log("Found local data, displaying...");
-            const localTasks = await getLocalTasks();
-            taskArray = sortByDate(localTasks).reverse();
-            renderDateList(localTasks);
-            renderDateNav(localTasks);
-            showMigrationWarning();
-        } else {
-            taskArray = [];
-            renderDateList([]);
-            renderDateNav([]);
-        }
-    });
+/** Bootstrap the app: load data from IndexedDB and render. */
+async function initApp() {
+    await refreshUI();
 }
 
 /**
- * Debounce wrapper — collapses rapid consecutive snapshot callbacks
- * into a single render pass (e.g. when marking many tasks done at once).
- * @param {Array} dateLists - raw snapshot data from Firestore
+ * Re-read all date lists from IndexedDB and re-render the UI.
+ * Called on startup and after every CRUD mutation.
  */
-function debouncedRender(dateLists) {
-    clearTimeout(renderDebounceTimer);
-    renderDebounceTimer = setTimeout(() => {
-        renderDateList(dateLists);
-        renderDateNav(dateLists);
-    }, RENDER_DEBOUNCE_MS);
-}
-
-/** Show migration warning banner with login link. */
-function showMigrationWarning() {
-    const alertDiv = document.getElementById('failure-message');
-    if (alertDiv) {
-        alertDiv.classList.remove('alert-danger');
-        alertDiv.classList.add('alert-warning');
-        alertDiv.innerHTML = '<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.';
-        alertDiv.style.display = '';
-
-        document.getElementById('migration-login-link')?.addEventListener('click', (event) => {
-            event.preventDefault();
-            document.getElementById('login-btn').click();
-        });
-    }
+async function refreshUI() {
+    const dateLists = await TodoService.getAllDateLists();
+    renderDateList(dateLists);
+    renderDateNav(dateLists);
 }
 
 // Start the app
@@ -177,7 +110,7 @@ function dateListChanged(prev, curr) {
 /**
  * Render the main date-list view. Uses differential updates:
  * only re-renders date lists that have actually changed.
- * @param {Array} dateLists - array of date-list objects from Firestore
+ * @param {Array} dateLists - array of date-list objects from IndexedDB
  */
 function renderDateList(dateLists) {
     taskArray = sortByDate(dateLists).reverse();
@@ -453,16 +386,14 @@ function renderTaskDetailHTML(task) {
 // ─── CRUD Operations ─────────────────────────────────────────
 
 /**
- * Delete a date list from Firestore.
+ * Delete a date list.
  * @param {string} dateId
  */
 async function deleteDateList(dateId) {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     try {
-        await TodoService.deleteDateList(user.uid, dateId);
+        await TodoService.deleteDateList(dateId);
         setMessageState('success', 'Date list deleted successfully!');
+        await refreshUI();
     } catch (error) {
         console.error("deleteDateList — failed:", error);
         setMessageState('failure', 'Error deleting date list');
@@ -478,9 +409,6 @@ async function deleteDateList(dateId) {
  * @param {number} [statusCode=1001]
  */
 async function createTask(taskName, dateId, inputElement, desc, statusCode) {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     if (taskName === '') {
         setMessageState('failure', 'Task name cannot be empty.');
         return;
@@ -494,8 +422,9 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode) {
     };
 
     try {
-        await TodoService.addTask(user.uid, dateId, newTask);
+        await TodoService.addTask(dateId, newTask);
         setMessageState('success', 'Task created successfully!');
+        await refreshUI();
         // Clear and re-focus the input field so the user can keep adding tasks
         if (inputElement) {
             inputElement.value = '';
@@ -514,12 +443,10 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode) {
  * @returns {Promise<boolean>} true if deleted successfully
  */
 async function deleteTasks(dateId, taskId) {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     try {
-        await TodoService.deleteTask(user.uid, dateId, taskId);
+        await TodoService.deleteTask(dateId, taskId);
         setMessageState('success', 'Task deleted successfully!');
+        await refreshUI();
         return true;
     } catch (error) {
         console.error("deleteTasks — failed:", error);
@@ -537,9 +464,6 @@ async function deleteTasks(dateId, taskId) {
  * @param {boolean|string} taskDetails - true to save notes area HTML
  */
 async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails) {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     const updates = {};
     if (taskName !== '') updates.name = replaceURLs(taskName);
     if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
@@ -549,8 +473,9 @@ async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails
     }
 
     try {
-        await TodoService.updateTask(user.uid, dateId, taskId, updates);
+        await TodoService.updateTask(dateId, taskId, updates);
         setMessageState('success', 'Task updated successfully!');
+        await refreshUI();
         const taskObj = findTask(dateId, taskId);
         // Refresh the detail view with updated data
         const detailContainer = document.getElementById('task-detail-container');
@@ -593,16 +518,13 @@ function findTask(dateId, taskId) {
 // ─── Date List Creation ──────────────────────────────────────
 
 /**
- * Create a new empty date list in Firestore.
+ * Create a new empty date list.
  * @param {string} dateId - "YYYY-MM-DD"
  * @param {string} dateName - human-readable date name
  */
 async function createDateList(dateId, dateName) {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     try {
-        const existing = await TodoService.getDateList(user.uid, dateId);
+        const existing = await TodoService.getDateList(dateId);
         if (existing) {
             setMessageState('success', 'Date list already exists.');
             return;
@@ -615,8 +537,9 @@ async function createDateList(dateId, dateName) {
             statusCode: STATUS_TODO,
         };
 
-        await TodoService.saveDateList(user.uid, newDateList);
+        await TodoService.saveDateList(newDateList);
         setMessageState('success', 'Date list successfully created!');
+        await refreshUI();
     } catch (error) {
         console.error("createDateList — failed:", error);
         setMessageState('failure', 'Error creating date list');
@@ -646,9 +569,6 @@ function getSelectedList() {
  * Batch-delete all selected tasks, grouped by date list for efficiency.
  */
 async function deleteSelectedList() {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     document.getElementById('context-menu').style.display = 'none';
 
     const selected = getSelectedList();
@@ -663,9 +583,10 @@ async function deleteSelectedList() {
 
     try {
         for (const [dateId, taskIds] of grouped) {
-            await TodoService.batchDeleteTasks(user.uid, dateId, taskIds);
+            await TodoService.batchDeleteTasks(dateId, taskIds);
         }
         setMessageState('success', `Deleted ${selected.length} task(s) successfully!`);
+        await refreshUI();
     } catch (error) {
         console.error("deleteSelectedList — failed:", error);
         setMessageState('failure', 'Error deleting selected tasks');
@@ -678,9 +599,6 @@ async function deleteSelectedList() {
  * Batch-toggle done/undone for all selected tasks, grouped by date list.
  */
 async function doneSelectedList() {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     document.getElementById('context-menu').style.display = 'none';
 
     const selected = getSelectedList();
@@ -696,9 +614,10 @@ async function doneSelectedList() {
 
     try {
         for (const [dateId, taskUpdates] of grouped) {
-            await TodoService.batchUpdateTasks(user.uid, dateId, taskUpdates);
+            await TodoService.batchUpdateTasks(dateId, taskUpdates);
         }
         setMessageState('success', `Updated ${selected.length} task(s) successfully!`);
+        await refreshUI();
     } catch (error) {
         console.error("doneSelectedList — failed:", error);
         setMessageState('failure', 'Error updating selected tasks');
@@ -708,13 +627,10 @@ async function doneSelectedList() {
 }
 
 /**
- * Mark all incomplete tasks in a date list as completed (single Firestore write).
+ * Mark all incomplete tasks in a date list as completed.
  * @param {string} dateId
  */
 async function markAllAsDone(dateId) {
-    const user = getCurrentUser();
-    if (!user) return alert("Please login first");
-
     const dateList = taskArray.find((dl) => dl.id === dateId);
     if (!dateList) return;
 
@@ -726,12 +642,156 @@ async function markAllAsDone(dateId) {
     if (!taskUpdates.length) return;
 
     try {
-        await TodoService.batchUpdateTasks(user.uid, dateId, taskUpdates);
+        await TodoService.batchUpdateTasks(dateId, taskUpdates);
         setMessageState('success', `Marked ${taskUpdates.length} task(s) as completed!`);
+        await refreshUI();
     } catch (error) {
         console.error("markAllAsDone — failed:", error);
         setMessageState('failure', 'Error marking tasks as completed');
     }
+}
+
+// ─── CSV Import / Export ─────────────────────────────────────
+
+/**
+ * RFC 4180 CSV field escaping.
+ * @param {*} value
+ * @returns {string}
+ */
+function csvEscape(value) {
+    const s = String(value ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+}
+
+/**
+ * Export all date lists + tasks as a CSV file download.
+ */
+function exportCSV() {
+    const rows = ['date_id,date_name,task_id,task_name,status_code,description'];
+
+    for (const dl of taskArray) {
+        if (!dl.taskList || dl.taskList.length === 0) {
+            rows.push([csvEscape(dl.id), csvEscape(dl.name), '', '', '', ''].join(','));
+        } else {
+            for (const t of dl.taskList) {
+                rows.push([
+                    csvEscape(dl.id), csvEscape(dl.name),
+                    csvEscape(t.id), csvEscape(t.name),
+                    csvEscape(t.statusCode), csvEscape(t.desc),
+                ].join(','));
+            }
+        }
+    }
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `todo-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessageState('success', 'CSV exported successfully!');
+}
+
+/**
+ * Parse a CSV string (RFC 4180) into an array of row arrays.
+ * @param {string} text
+ * @returns {Array<Array<string>>}
+ */
+function parseCSV(text) {
+    const rows = [];
+    let current = [];
+    let field = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else { inQuotes = false; }
+            } else {
+                field += ch;
+            }
+        } else {
+            if (ch === '"') { inQuotes = true; }
+            else if (ch === ',') { current.push(field); field = ''; }
+            else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+                current.push(field); field = '';
+                rows.push(current); current = [];
+                if (ch === '\r') i++;
+            } else {
+                field += ch;
+            }
+        }
+    }
+    // Last field / row
+    if (field || current.length) {
+        current.push(field);
+        rows.push(current);
+    }
+    return rows;
+}
+
+/**
+ * Import a CSV file: parse it, write date lists to IndexedDB, and re-render.
+ */
+async function importCSV() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const rows = parseCSV(text);
+            if (rows.length < 2) {
+                setMessageState('failure', 'CSV file is empty or has no data rows.');
+                return;
+            }
+
+            // Skip header row, group by date_id
+            const dateListMap = new Map();
+            for (let i = 1; i < rows.length; i++) {
+                const [dateId, dateName, taskId, taskName, statusCode, desc] = rows[i];
+                if (!dateId) continue;
+
+                if (!dateListMap.has(dateId)) {
+                    dateListMap.set(dateId, {
+                        id: dateId,
+                        name: dateName || dateId,
+                        taskList: [],
+                        statusCode: 1001,
+                    });
+                }
+
+                if (taskId && taskName) {
+                    dateListMap.get(dateId).taskList.push({
+                        id: taskId,
+                        name: taskName,
+                        statusCode: Number(statusCode) || 1001,
+                        desc: desc || '',
+                    });
+                }
+            }
+
+            // Write each date list to IndexedDB
+            for (const dateList of dateListMap.values()) {
+                await TodoService.saveDateList(dateList);
+            }
+
+            await refreshUI();
+            setMessageState('success', `Imported ${dateListMap.size} date list(s) successfully!`);
+        } catch (error) {
+            console.error('importCSV — failed:', error);
+            setMessageState('failure', 'Error importing CSV file');
+        }
+    });
+    input.click();
 }
 
 // ─── Exports ─────────────────────────────────────────────────
@@ -753,4 +813,6 @@ export {
     doneSelectedList,
     markAllAsDone,
     createDateList,
+    exportCSV,
+    importCSV,
 };

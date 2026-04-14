@@ -1,60 +1,130 @@
 // ============================================================
-// todo-service.js — Firestore CRUD for date-lists, tasks & notes
+// todo-service.js — IndexedDB CRUD for date-lists, tasks & notes
 // ============================================================
 
-import { db } from "./firebase-config.js";
 import { TASK_ID_OFFSET } from "./utils.js";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/** Firestore sub-collection name for to-do date lists */
-const DATE_LISTS_COLLECTION = "dateLists";
-
-/** Firestore sub-collection name for notes pages */
-const NOTES_COLLECTION = "notes";
+/** IndexedDB database / store names */
+const TASKS_DB_NAME = 'TasksDB';
+const TASKS_STORE_NAME = 'tasksData';
+const NOTES_DB_NAME = 'NotesDB';
+const NOTES_STORE_NAME = 'notesData';
 
 /**
- * Helper — returns a Firestore DocumentReference for a date list.
- * @param {string} userId
- * @param {string} dateId - e.g. "2026-04-06"
+ * Open (or create) an IndexedDB database with a single object store.
+ * @param {string} dbName
+ * @param {string} storeName
+ * @returns {Promise<IDBDatabase>}
  */
-const dateListRef = (userId, dateId) =>
-    doc(db, "users", userId, DATE_LISTS_COLLECTION, dateId);
+function openDB(dbName, storeName) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName, { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+/**
+ * Generic helper — get all records from a store.
+ * @param {string} dbName
+ * @param {string} storeName
+ * @returns {Promise<Array>}
+ */
+async function getAll(dbName, storeName) {
+    const db = await openDB(dbName, storeName);
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+/**
+ * Generic helper — get a single record by key.
+ * @param {string} dbName
+ * @param {string} storeName
+ * @param {string} key
+ * @returns {Promise<Object|undefined>}
+ */
+async function getByKey(dbName, storeName, key) {
+    const db = await openDB(dbName, storeName);
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+/**
+ * Generic helper — put (insert or overwrite) a record.
+ * @param {string} dbName
+ * @param {string} storeName
+ * @param {Object} record
+ * @returns {Promise<void>}
+ */
+async function putRecord(dbName, storeName, record) {
+    const db = await openDB(dbName, storeName);
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.put(record);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/**
+ * Generic helper — delete a record by key.
+ * @param {string} dbName
+ * @param {string} storeName
+ * @param {string} key
+ * @returns {Promise<void>}
+ */
+async function deleteByKey(dbName, storeName, key) {
+    const db = await openDB(dbName, storeName);
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
 
 export const TodoService = {
 
     // ─── Notes Operations ────────────────────────────────────
 
     /**
-     * Subscribe to real-time notes updates.
-     * @param {string} userId
-     * @param {Function} callback - receives an array of note objects
-     * @returns {Function|undefined} Unsubscribe function
+     * Get all notes from IndexedDB.
+     * @returns {Promise<Array>}
      */
-    subscribeNotes(userId, callback) {
-        if (!userId) return;
-
-        const notesQuery = query(collection(db, "users", userId, NOTES_COLLECTION));
-
-        return onSnapshot(notesQuery, (snapshot) => {
-            const notes = [];
-            snapshot.forEach((docSnap) => {
-                notes.push(docSnap.data());
-            });
-            callback(notes);
-        }, (error) => {
-            console.error("TodoService.subscribeNotes — snapshot error:", error);
-        });
+    async getAllNotes() {
+        try {
+            return await getAll(NOTES_DB_NAME, NOTES_STORE_NAME);
+        } catch (error) {
+            console.error("TodoService.getAllNotes — failed:", error);
+            return [];
+        }
     },
 
     /**
      * Create or update a note/page.
-     * @param {string} userId
      * @param {{id: string, name: string, status: number, html: string}} note
      */
-    async saveNote(userId, note) {
-        if (!userId) return;
+    async saveNote(note) {
         try {
-            await setDoc(doc(db, "users", userId, NOTES_COLLECTION, note.id), note);
+            await putRecord(NOTES_DB_NAME, NOTES_STORE_NAME, note);
         } catch (error) {
             console.error("TodoService.saveNote — failed:", error);
             throw error;
@@ -63,13 +133,11 @@ export const TodoService = {
 
     /**
      * Delete a note/page.
-     * @param {string} userId
      * @param {string} noteId
      */
-    async deleteNote(userId, noteId) {
-        if (!userId) return;
+    async deleteNote(noteId) {
         try {
-            await deleteDoc(doc(db, "users", userId, NOTES_COLLECTION, noteId));
+            await deleteByKey(NOTES_DB_NAME, NOTES_STORE_NAME, noteId);
         } catch (error) {
             console.error("TodoService.deleteNote — failed:", error);
             throw error;
@@ -79,38 +147,27 @@ export const TodoService = {
     // ─── Todo Operations ─────────────────────────────────────
 
     /**
-     * Subscribe to real-time date-list updates.
-     * @param {string} userId
-     * @param {Function} callback - receives an array of date-list objects
-     * @returns {Function|undefined} Unsubscribe function
+     * Get all date lists from IndexedDB.
+     * @returns {Promise<Array>}
      */
-    subscribe(userId, callback) {
-        if (!userId) return;
-
-        const listsQuery = query(collection(db, "users", userId, DATE_LISTS_COLLECTION));
-
-        return onSnapshot(listsQuery, (snapshot) => {
-            const dateLists = [];
-            snapshot.forEach((docSnap) => {
-                dateLists.push(docSnap.data());
-            });
-            callback(dateLists);
-        }, (error) => {
-            console.error("TodoService.subscribe — snapshot error:", error);
-        });
+    async getAllDateLists() {
+        try {
+            return await getAll(TASKS_DB_NAME, TASKS_STORE_NAME);
+        } catch (error) {
+            console.error("TodoService.getAllDateLists — failed:", error);
+            return [];
+        }
     },
 
     /**
      * Get a single date list by ID.
-     * @param {string} userId
      * @param {string} dateListId
      * @returns {Promise<Object|null>}
      */
-    async getDateList(userId, dateListId) {
-        if (!userId) return null;
+    async getDateList(dateListId) {
         try {
-            const docSnap = await getDoc(dateListRef(userId, dateListId));
-            return docSnap.exists() ? docSnap.data() : null;
+            const result = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateListId);
+            return result || null;
         } catch (error) {
             console.error("TodoService.getDateList — failed:", error);
             throw error;
@@ -118,14 +175,12 @@ export const TodoService = {
     },
 
     /**
-     * Create or overwrite a date list document.
-     * @param {string} userId
+     * Create or overwrite a date list.
      * @param {{id: string, name: string, taskList: Array, statusCode: number}} dateList
      */
-    async saveDateList(userId, dateList) {
-        if (!userId) return;
+    async saveDateList(dateList) {
         try {
-            await setDoc(dateListRef(userId, dateList.id), dateList);
+            await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
         } catch (error) {
             console.error("TodoService.saveDateList — failed:", error);
             throw error;
@@ -133,14 +188,12 @@ export const TodoService = {
     },
 
     /**
-     * Delete a date list document.
-     * @param {string} userId
+     * Delete a date list.
      * @param {string} dateListId
      */
-    async deleteDateList(userId, dateListId) {
-        if (!userId) return;
+    async deleteDateList(dateListId) {
         try {
-            await deleteDoc(dateListRef(userId, dateListId));
+            await deleteByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateListId);
         } catch (error) {
             console.error("TodoService.deleteDateList — failed:", error);
             throw error;
@@ -149,20 +202,15 @@ export const TodoService = {
 
     /**
      * Add a single task to a date list (read-modify-write).
-     * @param {string} userId
      * @param {string} dateId
      * @param {{id: string, name: string, statusCode: number, desc: string}} task
      */
-    async addTask(userId, dateId, task) {
-        if (!userId) return;
-        const ref = dateListRef(userId, dateId);
-
+    async addTask(dateId, task) {
         try {
-            const docSnap = await getDoc(ref);
-            if (docSnap.exists()) {
-                const dateList = docSnap.data();
+            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
+            if (dateList) {
                 dateList.taskList.push(task);
-                await setDoc(ref, dateList);
+                await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
             }
         } catch (error) {
             console.error("TodoService.addTask — failed:", error);
@@ -172,23 +220,18 @@ export const TodoService = {
 
     /**
      * Update fields on a single task inside a date list (read-modify-write).
-     * @param {string} userId
      * @param {string} dateId
      * @param {string} taskId - the suffix portion of the full task ID
      * @param {Object} updates - key/value pairs to merge into the task
      */
-    async updateTask(userId, dateId, taskId, updates) {
-        if (!userId) return;
-        const ref = dateListRef(userId, dateId);
-
+    async updateTask(dateId, taskId, updates) {
         try {
-            const docSnap = await getDoc(ref);
-            if (docSnap.exists()) {
-                const dateList = docSnap.data();
+            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
+            if (dateList) {
                 const taskIndex = dateList.taskList.findIndex((t) => t.id.endsWith(taskId));
                 if (taskIndex !== -1) {
                     dateList.taskList[taskIndex] = { ...dateList.taskList[taskIndex], ...updates };
-                    await setDoc(ref, dateList);
+                    await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
                 }
             }
         } catch (error) {
@@ -199,20 +242,15 @@ export const TodoService = {
 
     /**
      * Delete a single task from a date list (read-modify-write).
-     * @param {string} userId
      * @param {string} dateId
      * @param {string} taskId - the suffix portion of the full task ID
      */
-    async deleteTask(userId, dateId, taskId) {
-        if (!userId) return;
-        const ref = dateListRef(userId, dateId);
-
+    async deleteTask(dateId, taskId) {
         try {
-            const docSnap = await getDoc(ref);
-            if (docSnap.exists()) {
-                const dateList = docSnap.data();
+            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
+            if (dateList) {
                 dateList.taskList = dateList.taskList.filter((t) => !t.id.endsWith(taskId));
-                await setDoc(ref, dateList);
+                await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
             }
         } catch (error) {
             console.error("TodoService.deleteTask — failed:", error);
@@ -221,24 +259,18 @@ export const TodoService = {
     },
 
     /**
-     * Batch-update multiple tasks within a single date list in ONE Firestore write.
-     * Reads the document once, applies all updates, writes once — avoids N separate
-     * snapshot triggers when marking many tasks done, etc.
+     * Batch-update multiple tasks within a single date list in ONE write.
      *
-     * @param {string} userId
      * @param {string} dateId
      * @param {Array<{taskId: string, updates: Object}>} taskUpdates
      *        Each entry: { taskId (suffix), updates: { statusCode, name, … } }
      */
-    async batchUpdateTasks(userId, dateId, taskUpdates) {
-        if (!userId || !taskUpdates?.length) return;
-        const ref = dateListRef(userId, dateId);
+    async batchUpdateTasks(dateId, taskUpdates) {
+        if (!taskUpdates?.length) return;
 
         try {
-            const docSnap = await getDoc(ref);
-            if (!docSnap.exists()) return;
-
-            const dateList = docSnap.data();
+            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
+            if (!dateList) return;
 
             for (const { taskId, updates } of taskUpdates) {
                 const index = dateList.taskList.findIndex((t) => t.id.endsWith(taskId));
@@ -247,7 +279,7 @@ export const TodoService = {
                 }
             }
 
-            await setDoc(ref, dateList);
+            await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
         } catch (error) {
             console.error("TodoService.batchUpdateTasks — failed:", error);
             throw error;
@@ -255,28 +287,25 @@ export const TodoService = {
     },
 
     /**
-     * Batch-delete multiple tasks within a single date list in ONE Firestore write.
+     * Batch-delete multiple tasks within a single date list in ONE write.
      *
-     * @param {string} userId
      * @param {string} dateId
      * @param {Array<string>} taskIds - array of task ID suffixes to remove
      */
-    async batchDeleteTasks(userId, dateId, taskIds) {
-        if (!userId || !taskIds?.length) return;
-        const ref = dateListRef(userId, dateId);
+    async batchDeleteTasks(dateId, taskIds) {
+        if (!taskIds?.length) return;
 
         try {
-            const docSnap = await getDoc(ref);
-            if (!docSnap.exists()) return;
+            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
+            if (!dateList) return;
 
-            const dateList = docSnap.data();
             const idsToRemove = new Set(taskIds);
             dateList.taskList = dateList.taskList.filter((t) => {
                 const suffix = t.id.slice(TASK_ID_OFFSET);
                 return !idsToRemove.has(suffix);
             });
 
-            await setDoc(ref, dateList);
+            await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
         } catch (error) {
             console.error("TodoService.batchDeleteTasks — failed:", error);
             throw error;

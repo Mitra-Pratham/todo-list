@@ -3,9 +3,6 @@
 // ============================================================
 
 import { TodoService } from "./todo-service.js";
-import { auth } from "./firebase-config.js";
-import { initAuth, getCurrentUser } from "./auth.js";
-import { migrateData, getLocalNotes } from "./migration.js";
 import { replaceURLs, escapeHTML } from "./utils.js";
 import { createRTFToolbar } from "./notes-common.js";
 
@@ -24,114 +21,33 @@ const DEFAULT_NOTE_ID = 'notes-area-0000001';
 
 // ─── App Initialisation ──────────────────────────────────────
 
-/** Bootstrap the notes page: set up auth listeners and Firestore subscription. */
-function initApp() {
-    const onLogin = async (user) => {
-        const failureMsg = document.getElementById('failure-message');
-        if (failureMsg) failureMsg.style.display = 'none';
+/** Bootstrap the notes page: load notes from IndexedDB and render. */
+async function initApp() {
+    try {
+        notesArray = await TodoService.getAllNotes();
 
-        // Migrate local IndexedDB notes to Firestore if present
-        if (await migrateData(user.uid)) {
-            const successDiv = document.getElementById('success-message');
-            if (successDiv) {
-                successDiv.innerHTML = '<strong>Success!</strong> Migration complete! Your data is now in the cloud.';
-                successDiv.style.display = 'block';
-                setTimeout(() => { successDiv.style.display = 'none'; }, 5000);
-            }
+        // Seed a default note if none exist yet
+        if (!notesArray || notesArray.length === 0) {
+            const defaultNote = {
+                id: DEFAULT_NOTE_ID,
+                name: 'Default',
+                status: 1001,
+                html: DEFAULT_NOTE_HTML,
+            };
+            await TodoService.saveNote(defaultNote);
+            notesArray = [defaultNote];
         }
 
-        // Subscribe to real-time notes updates
-        TodoService.subscribeNotes(user.uid, (notes) => {
-            notesArray = notes;
+        // Determine which page to display
+        const pageToShow = notesArray.find((n) => n.id === pageDefaultID) || notesArray[0];
 
-            // Seed a default note if none exist yet
-            if (!notesArray || notesArray.length === 0) {
-                const defaultNote = {
-                    id: DEFAULT_NOTE_ID,
-                    name: 'Default',
-                    status: 1001,
-                    html: DEFAULT_NOTE_HTML,
-                };
-                TodoService.saveNote(user.uid, defaultNote);
-                return; // Wait for next snapshot with the new note
-            }
-
-            // Determine which page to display
-            const editorEl = document.getElementById('notes-detail-area');
-            const activePageId = editorEl?.getAttribute('value');
-            let pageToShow = notesArray.find((n) => n.id === activePageId);
-
-            if (!pageToShow) {
-                pageToShow = notesArray.find((n) => n.id === pageDefaultID) || notesArray[0];
-            }
-
-            if (pageToShow) {
-                createPageTabs(notesArray, pageToShow.id);
-
-                // Avoid overwriting content while the user is actively editing
-                const editorNow = document.getElementById('notes-detail-area');
-                const isFocused = document.activeElement === editorNow;
-                if (!isFocused || editorNow?.getAttribute('value') !== pageToShow.id) {
-                    renderNotesDetailHTML(pageToShow);
-                }
-            }
-        });
-    };
-
-    const onLogout = async () => {
-        const failureMsgOut = document.getElementById('failure-message');
-        if (failureMsgOut) failureMsgOut.style.display = 'none';
-
-        try {
-            const localNotes = await getLocalNotes();
-            notesArray = localNotes;
-
-            if (!notesArray || notesArray.length === 0) {
-                notesArray = [{
-                    id: DEFAULT_NOTE_ID,
-                    name: 'Default',
-                    status: 1001,
-                    html: DEFAULT_NOTE_HTML,
-                }];
-            } else {
-                // Show migration warning if local data exists
-                const alertDiv = document.getElementById('failure-message');
-                if (alertDiv) {
-                    alertDiv.classList.remove('alert-danger');
-                    alertDiv.classList.add('alert-warning');
-                    alertDiv.innerHTML = '<strong>Attention!</strong> You have local data. Please <a href="#" id="migration-login-link" class="alert-link">login</a> to migrate data.';
-                    alertDiv.style.display = 'block';
-
-                    document.getElementById('migration-login-link')?.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        document.getElementById('login-btn').click();
-                    });
-                }
-            }
-
-            // Render the first available page
-            const editorLogout = document.getElementById('notes-detail-area');
-            const activePageId = editorLogout?.getAttribute('value');
-            const pageToShow = notesArray.find((n) => n.id === activePageId) || notesArray[0];
-
-            if (pageToShow) {
-                renderNotesDetailHTML(pageToShow);
-            } else {
-                console.error('notes-detail.js — no page to show after logout.');
-            }
-
-            createPageTabs(notesArray, pageToShow?.id ?? null);
-        } catch (error) {
-            console.error('notes-detail.js — logout local-data flow failed:', error);
-            notesArray = [];
-            const dc = document.getElementById('notes-detail-container');
-            if (dc) dc.innerHTML = '';
-            const tc = document.getElementById('notes-detail-pages-tab-container');
-            if (tc) tc.innerHTML = '';
+        if (pageToShow) {
+            renderNotesDetailHTML(pageToShow);
+            createPageTabs(notesArray, pageToShow.id);
         }
-    };
-
-    initAuth(onLogin, onLogout);
+    } catch (error) {
+        console.error('notes-detail.js — initApp failed:', error);
+    }
 }
 
 // ─── Toaster / Persistence Helpers ───────────────────────────
@@ -146,14 +62,11 @@ function showSavedToaster() {
 }
 
 /**
- * Persist a single note object to Firestore and show the saved toaster.
+ * Persist a single note object to IndexedDB and show the saved toaster.
  * @param {{id: string, name: string, status: number, html: string}} note
  */
 function saveSingleNoteToDB(note) {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    TodoService.saveNote(user.uid, note)
+    TodoService.saveNote(note)
         .then(() => showSavedToaster())
         .catch((error) => console.error('notes-detail.js — saveSingleNoteToDB failed:', error));
 }
@@ -332,11 +245,8 @@ function deletePage(pageId) {
 
     notesArray = notesArray.filter((page) => page.id !== pageId);
 
-    const user = getCurrentUser();
-    if (user) {
-        TodoService.deleteNote(user.uid, pageId)
-            .catch((error) => console.error('notes-detail.js — deletePage failed:', error));
-    }
+    TodoService.deleteNote(pageId)
+        .catch((error) => console.error('notes-detail.js — deletePage failed:', error));
 
     createPageTabs(notesArray, fallbackId);
     const fallbackPage = findPage(fallbackId);
