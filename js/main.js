@@ -333,7 +333,7 @@ function buildNavDayItem(dateItem, isToday) {
     const incomplete = completed !== total;
 
     return `
-        <div class="flex items-center border-l border-slate-700 ml-1">
+        <div class="flex items-center border-l ml-1" style="border-color:var(--surface-dark-border)">
             <a class="nav-sidebar-day ${isToday ? 'btn-no-bg-gray-active' : ''}"
                href="#date-item-${dateItem.id}">
                 ${dateItem.name}
@@ -815,4 +815,5 @@ export {
     createDateList,
     exportCSV,
     importCSV,
+    refreshUI,
 };

@@ -27,28 +27,40 @@
     <!-- ─── Activity Bar (icon strip, far left) ─────────────────── -->
     <aside class="activity-bar">
         <div class="activity-bar-top">
-            <a href="index.html" class="activity-icon active" title="To-Do List">
+            <a href="index.html" class="activity-icon active">
                 <i class="fa-solid fa-list-check"></i>
+                <span class="btn-title">To-Do List</span>
             </a>
-            <button id="calendar-toggle-btn" class="activity-icon" type="button" title="Calendar">
+            <button id="calendar-toggle-btn" class="activity-icon" type="button">
                 <i class="fa-solid fa-calendar-days"></i>
+                <span class="btn-title">Calendar</span>
             </button>
-            <a href="notes.html" class="activity-icon" title="Notes">
+            <a href="notes.html" class="activity-icon">
                 <i class="fa-solid fa-note-sticky"></i>
+                <span class="btn-title">Notes</span>
             </a>
-            <button id="create-toggle-btn" class="activity-icon" type="button" title="Create Date List">
+            <button id="create-toggle-btn" class="activity-icon" type="button">
                 <i class="fa-solid fa-plus"></i>
+                <span class="btn-title">Create Date List</span>
             </button>
         </div>
         <div class="activity-bar-bottom">
-            <button id="export-csv-btn" class="activity-icon" type="button" title="Export CSV">
+            <button id="export-csv-btn" class="activity-icon" type="button">
                 <i class="fa-solid fa-download"></i>
+                <span class="btn-title">Export CSV</span>
             </button>
-            <button id="import-csv-btn" class="activity-icon" type="button" title="Import CSV">
+            <button id="import-csv-btn" class="activity-icon" type="button">
                 <i class="fa-solid fa-upload"></i>
+                <span class="btn-title">Import CSV</span>
             </button>
-            <button id="theme-toggle-btn" class="activity-icon" type="button" title="Toggle Theme">
+            <div id="mcp-status-indicator" class="activity-icon mcp-status-indicator disconnected"
+                role="status" aria-live="polite">
+                <span class="mcp-status-dot" aria-hidden="true"></span>
+                <span class="btn-title">MCP: disconnected</span>
+            </div>
+            <button id="theme-toggle-btn" class="activity-icon" type="button">
                 <i class="fa-solid fa-sun"></i>
+                <span class="btn-title">Toggle Theme</span>
             </button>
         </div>
     </aside>
@@ -139,5 +151,6 @@
 <script type="module" src="js/listeners.js"></script>
 <script type="module" src="js/drag.js"></script>
 <script type="module" src="js/calendar.js"></script>
+<script type="module" src="js/mcp-bridge.js"></script>
 
 </html>

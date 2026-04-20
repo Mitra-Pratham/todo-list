@@ -298,9 +298,6 @@
     border-left-style: var(--tw-border-style);
     border-left-width: 1px;
   }
-  .border-slate-700 {
-    border-color: var(--color-slate-700);
-  }
   .p-3 {
     padding: calc(var(--spacing) * 3);
   }

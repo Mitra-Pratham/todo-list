@@ -1,3 +1,7 @@
+# Root-only: the root package.json is for Tailwind dev-deps only and is
+# not part of the GitHub Pages site. mcp-server/package.json MUST be
+# committed so Claude Desktop can spawn the MCP server.
+/package.json
+/package-lock.json
+/mcp-server
 node_modules/
-package-lock.json
-package.json

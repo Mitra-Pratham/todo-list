@@ -44,50 +44,56 @@
   --overlay-border: rgba(255,255,255, 0.12);
   /* Toaster */
   --toaster-bg: rgba(22, 25, 29, 0.85);
+  /* Tooltip defaults (dark mode — matches surface) */
+  --tooltip-bg: var(--surface-dark);
+  --tooltip-text: var(--text-bright);
 }
 
-/* ─── Design Tokens — Atom One Light ─────────────────────────── */
+/* ─── Design Tokens — Bootstrap 5 Light ─────────────────────── */
 [data-theme="light"] {
   color-scheme: light;
-  --color-primary: #4078f2;
-  --color-primary-hover: #3066d4;
-  --color-danger: #e45649;
-  --color-success: #50a14f;
-  --color-warning: #c18401;
-  --actbar-bg: #e5e5e6;
-  --actbar-icon: #a0a1a7;
-  --actbar-icon-active: #383a42;
-  --surface-dark: #eaeaeb;
-  --surface-dark-hover: rgba(64,120,242, 0.10);
-  --surface-dark-active: rgba(64,120,242, 0.15);
-  --surface-dark-border: #dbdbdc;
-  --text-on-dark: #383a42;
-  --text-on-dark-muted: #696c77;
-  --bg-canvas: #fafafa;
+  --color-primary: #0d6efd;
+  --color-primary-hover: #0b5ed7;
+  --color-danger: #dc3545;
+  --color-success: #198754;
+  --color-warning: #ffc107;
+  --actbar-bg: #f8f9fa;
+  --actbar-icon: #6c757d;
+  --actbar-icon-active: #0d6efd;
+  --surface-dark: #f8f9fa;
+  --surface-dark-hover: rgba(13,110,253, 0.10);
+  --surface-dark-active: rgba(13,110,253, 0.15);
+  --surface-dark-border: #dee2e6;
+  --text-on-dark: #212529;
+  --text-on-dark-muted: #adb5bd;
+  --bg-canvas: #f8f9fa;
   --bg-card: #ffffff;
-  --border-dark: #d0d0d1;
-  --text-primary: #383a42;
-  --text-secondary: #a0a1a7;
-  --link-color: #4078f2;
-  --text-bright: #232324;
+  --border-dark: #dee2e6;
+  --text-primary: #212529;
+  --text-secondary: #adb5bd;
+  --link-color: #0d6efd;
+  --text-bright: #000000;
   --text-on-accent: #ffffff;
-  --primary-tint-subtle: rgba(64,120,242, 0.06);
-  --primary-tint: rgba(64,120,242, 0.08);
-  --primary-tint-medium: rgba(64,120,242, 0.15);
-  --primary-tint-strong: rgba(64,120,242, 0.3);
-  --primary-focus-ring: rgba(64,120,242, 0.4);
-  --overlay-hover: rgba(64,120,242, 0.06);
-  --overlay-border: rgba(0,0,0, 0.08);
-  --toaster-bg: rgba(255, 255, 255, 0.85);
+  --primary-tint-subtle: rgba(13,110,253, 0.06);
+  --primary-tint: rgba(13,110,253, 0.08);
+  --primary-tint-medium: rgba(13,110,253, 0.15);
+  --primary-tint-strong: rgba(13,110,253, 0.3);
+  --primary-focus-ring: rgba(13,110,253, 0.4);
+  --overlay-hover: rgba(13,110,253, 0.06);
+  --overlay-border: rgba(0,0,0, 0.125);
+  --toaster-bg: rgba(255, 255, 255, 0.9);
+  /* Tooltip — dark on light (original Bootstrap) */
+  --tooltip-bg: rgba(0, 0, 0, 0.9);
+  --tooltip-text: #fff;
   /* Tailwind @theme variable overrides (--color-* prefix) */
-  --color-surface-dark: #eaeaeb;
-  --color-surface-dark-hover: rgba(64,120,242, 0.10);
-  --color-actbar: #e5e5e6;
-  --color-bg-canvas: #fafafa;
+  --color-surface-dark: #f8f9fa;
+  --color-surface-dark-hover: rgba(13,110,253, 0.10);
+  --color-actbar: #f8f9fa;
+  --color-bg-canvas: #f8f9fa;
   --color-bg-card: #ffffff;
-  --color-border-dark: #d0d0d1;
-  --color-text-primary: #383a42;
-  --color-text-secondary: #a0a1a7;
+  --color-border-dark: #dee2e6;
+  --color-text-primary: #212529;
+  --color-text-secondary: #adb5bd;
 }
 
 html,
@@ -166,6 +172,39 @@ body {
   width: 3px;
   background: var(--color-primary);
   border-radius: 0 3px 3px 0;
+}
+
+/* ─── MCP Status Indicator ──────────────────────────────────
+   Non-interactive status display (not a button) showing whether
+   the browser is currently connected to the local MCP server.
+   States: .disconnected (default, muted), .connecting (warning),
+   .connected (success). Colours come from semantic tokens so
+   both dark and light themes Just Work. */
+.mcp-status-indicator {
+  cursor: default;
+  pointer-events: auto; /* keep hover so native tooltip shows */
+}
+.mcp-status-indicator:hover {
+  background: transparent;
+}
+.mcp-status-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--actbar-icon);
+  transition: background-color .2s ease, box-shadow .2s ease;
+}
+.mcp-status-indicator.connected .mcp-status-dot {
+  background: var(--color-success);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-success) 60%, transparent);
+}
+.mcp-status-indicator.connecting .mcp-status-dot {
+  background: var(--color-warning);
+}
+.mcp-status-indicator.disconnected .mcp-status-dot {
+  background: var(--actbar-icon);
+  opacity: .55;
 }
 
 /* ─── Create Popover ────────────────────────────────────────── */
@@ -343,9 +382,9 @@ body {
   position: absolute;
   top: 32px;
   left: -10px;
-  background: var(--surface-dark);
+  background: var(--tooltip-bg);
   font-size: .7rem;
-  color: var(--text-bright);
+  color: var(--tooltip-text);
   padding: 4px 8px;
   border-radius: 6px;
   width: max-content;
@@ -361,6 +400,18 @@ body {
 
 .btn:hover>.btn-title, .fc-event:hover>.btn-title {
   display: block;
+}
+
+/* Activity-bar icons use .activity-icon (not .btn), so add the hover
+   reveal + a right-side positioning variant. The default .btn-title
+   anchors below-left, which would clip off the far-left rail. */
+.activity-icon:hover > .btn-title {
+  display: block;
+}
+.activity-icon > .btn-title {
+  top: 50%;
+  left: calc(100% + 10px);
+  transform: translateY(-50%);
 }
 
 /* ─── Date Form (in create popover) ─────────────────────────── */
@@ -437,6 +488,8 @@ body {
   color: var(--text-on-dark-muted);
   padding: .25rem .5rem;
   display: block;
+  border-bottom: 1px solid var(--surface-dark-border);
+  margin-bottom: .25rem;
 }
 .nav-sidebar-day {
   font-size: .72rem;
@@ -837,7 +890,8 @@ input:hover {
   background: var(--surface-dark-active);
 }
 .notes-detail-section-toggle-container .btn-title {
-  background: var(--surface-dark-active);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
 }
 
 .notes-detail-sections-area {
