@@ -310,5 +310,55 @@ export const TodoService = {
             console.error("TodoService.batchDeleteTasks — failed:", error);
             throw error;
         }
-    }
+    },
+
+    // ─── Markdown Reader Draft ───────────────────────────────
+
+    /** Well-known key for the single markdown reader draft record */
+    MARKDOWN_DRAFT_ID: 'markdown-reader-draft',
+
+    /**
+     * Load the persisted markdown reader draft from IndexedDB.
+     * @returns {Promise<{id: string, content: string, updatedAt: number}|null>}
+     */
+    async getMarkdownDraft() {
+        try {
+            const record = await getByKey(NOTES_DB_NAME, NOTES_STORE_NAME, this.MARKDOWN_DRAFT_ID);
+            return record ?? null;
+        } catch (error) {
+            console.error("TodoService.getMarkdownDraft — failed:", error);
+            return null;
+        }
+    },
+
+    /**
+     * Persist the markdown reader draft to IndexedDB.
+     * @param {string} content - raw markdown text
+     * @returns {Promise<void>}
+     */
+    async saveMarkdownDraft(content) {
+        try {
+            await putRecord(NOTES_DB_NAME, NOTES_STORE_NAME, {
+                id: this.MARKDOWN_DRAFT_ID,
+                content,
+                updatedAt: Date.now(),
+            });
+        } catch (error) {
+            console.error("TodoService.saveMarkdownDraft — failed:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete the markdown reader draft from IndexedDB.
+     * @returns {Promise<void>}
+     */
+    async deleteMarkdownDraft() {
+        try {
+            await deleteByKey(NOTES_DB_NAME, NOTES_STORE_NAME, this.MARKDOWN_DRAFT_ID);
+        } catch (error) {
+            console.error("TodoService.deleteMarkdownDraft — failed:", error);
+            throw error;
+        }
+    },
 };

@@ -3,7 +3,7 @@
 // ============================================================
 
 import { TodoService } from "./todo-service.js";
-import { replaceURLs, escapeHTML } from "./utils.js";
+import { escapeHTML, sanitizeRichHTML } from "./utils.js";
 import { createRTFToolbar } from "./notes-common.js";
 
 /** Reusable CSS class string for small toolbar buttons */
@@ -65,10 +65,13 @@ function showSavedToaster() {
  * Persist a single note object to IndexedDB and show the saved toaster.
  * @param {{id: string, name: string, status: number, html: string}} note
  */
-function saveSingleNoteToDB(note) {
-    TodoService.saveNote(note)
-        .then(() => showSavedToaster())
-        .catch((error) => console.error('notes-detail.js — saveSingleNoteToDB failed:', error));
+async function saveSingleNoteToDB(note) {
+    try {
+        await TodoService.saveNote(note);
+        showSavedToaster();
+    } catch (error) {
+        console.error('notes-detail.js — saveSingleNoteToDB failed:', error);
+    }
 }
 
 // ─── Rendering ───────────────────────────────────────────────
@@ -272,7 +275,7 @@ function findPage(pageId) {
  */
 function saveText(pageId, shouldSaveHTML, newName) {
     const editor = document.getElementById('notes-detail-area');
-    const editorHTML = replaceURLs(editor ? editor.innerHTML : '');
+    const editorHTML = sanitizeRichHTML(editor?.innerHTML ?? '');
 
     notesArray = notesArray.map((page) => {
         if (page.id !== pageId) return page;
@@ -338,7 +341,7 @@ function importNotesJSON() {
                     id: page.id,
                     name: page.name,
                     status: page.status ?? 1001,
-                    html: page.html ?? '',
+                    html: page.html ? sanitizeRichHTML(page.html) : '',
                 };
                 await TodoService.saveNote(note);
             }

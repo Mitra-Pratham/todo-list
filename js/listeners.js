@@ -12,6 +12,7 @@ import {
     findTask,
     setMessageState,
     renderTaskDetailHTML,
+    renderMarkdownPreview,
     getSelectedList,
     deleteSelectedList,
     doneSelectedList,
@@ -19,10 +20,12 @@ import {
     createDateList,
     exportCSV,
     importCSV,
+    refreshUI,
     STATUS_TODO,
     STATUS_COMPLETED,
 } from "./main.js";
-import { replaceURLs, escapeHTML, isValidURL, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
+import { TodoService } from "./todo-service.js";
+import { replaceURLs, escapeHTML, isValidURL, sanitizeRichHTML, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
 import { createRTFToolbar } from "./notes-common.js";
 
 //--------------------Cached DOM references---------------------
@@ -142,12 +145,12 @@ function handleEditKeydown(e, el) {
         const taskId = el.getAttribute('taskid');
         updateTasks(dateId, taskId, newName, '', '');
         if (el.parentElement.classList.contains('offcanvas-title')) {
-            el.parentElement.innerHTML = replaceURLs(newName);
+            el.parentElement.innerHTML = replaceURLs(escapeHTML(newName));
         }
         el.remove();
     } else if (e.key === 'Escape') {
         const previousValue = el.getAttribute('prevvalue');
-        el.parentElement.innerHTML = replaceURLs(previousValue);
+        el.parentElement.innerHTML = replaceURLs(escapeHTML(previousValue));
     }
 }
 delegate(dateListContainer, 'keydown', '#update-task-name', handleEditKeydown);
@@ -348,14 +351,128 @@ delegate(detailContainer, 'keydown', '#task-notes-area', (e) => {
     }
 });
 
+// ─── Paste Sanitization ──────────────────────────────────────
+
+delegate(detailContainer, 'paste', '#task-notes-area', (e) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const html = clipboardData.getData('text/html');
+    if (!html) return; // plain-text paste — let browser handle natively
+
+    e.preventDefault();
+    try {
+        const sanitized = sanitizeRichHTML(html);
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+
+        const temp = document.createElement('template');
+        temp.innerHTML = sanitized;
+        const fragment = temp.content;
+        range.insertNode(fragment);
+
+        // Collapse cursor to end of inserted content
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    } catch (error) {
+        console.error('listeners.js — paste handler failed:', error);
+    }
+});
+
 /**
- * Helper — extract dateId and taskId from the task-notes-area value attribute.
+ * Helper — extract dateId and taskId from the task-notes-area or task-md-input value attribute.
+ * Checks for the rich-text area first, then falls back to the markdown textarea.
  * @returns {{dateId: string, taskId: string}}
  */
 function getNotesTaskIds() {
-    const value = document.getElementById('task-notes-area')?.getAttribute('value') || '';
+    const value = (
+        document.getElementById('task-notes-area')?.getAttribute('value')
+        ?? document.getElementById('task-md-input')?.getAttribute('value')
+        ?? ''
+    );
     return { dateId: value.slice(DATE_ID_START, DATE_ID_END), taskId: value.slice(TASK_ID_OFFSET) };
 }
+
+// ─── Markdown Mode Toggle ────────────────────────────────────
+
+/**
+ * Toggle between rich-text (HTML) and markdown editing modes.
+ * When switching HTML → MD: the existing HTML is preserved as-is in desc (no conversion).
+ * When switching MD → HTML: marked.parse() + sanitizeRichHTML() converts markdown to HTML.
+ */
+delegate(detailContainer, 'click', '.todo-task-md-toggle', async (e, el) => {
+    try {
+        const val = el.value;
+        const dateId = val.slice(DATE_ID_START, DATE_ID_END);
+        const taskId = val.slice(TASK_ID_OFFSET);
+        const currentFormat = el.dataset.format ?? 'html';
+
+        // Save current content before switching
+        if (currentFormat === 'md') {
+            // Converting MD → HTML: parse the markdown into rich HTML
+            const mdInput = document.getElementById('task-md-input');
+            const rawMd = mdInput?.value ?? '';
+            const convertedHtml = rawMd.trim()
+                ? sanitizeRichHTML(marked.parse(rawMd))
+                : '';
+            await TodoService.updateTask(dateId, taskId, { desc: convertedHtml, descFormat: 'html' });
+        } else {
+            // Converting HTML → MD: save current HTML first, then flip format
+            // Preserve existing HTML desc as-is — user can edit in MD later
+            const notesArea = document.getElementById('task-notes-area');
+            const currentDesc = sanitizeRichHTML(notesArea?.innerHTML ?? '');
+            await TodoService.updateTask(dateId, taskId, { desc: currentDesc, descFormat: 'md' });
+        }
+
+        // Re-fetch updated task and re-render detail view
+        await refreshUI();
+        const taskObj = findTask(dateId, taskId);
+        if (taskObj) {
+            detailContainer.innerHTML = renderTaskDetailHTML(taskObj);
+        }
+    } catch (error) {
+        console.error('listeners.js — markdown toggle failed:', error);
+        setMessageState('failure', 'Error switching editor mode');
+    }
+});
+
+// ─── Markdown Textarea Live Preview ──────────────────────────
+
+/** @type {number|null} Debounce timer for markdown detail textarea */
+let _mdDetailDebounce = null;
+
+/** Debounce delay (ms) for markdown detail preview updates */
+const MD_DETAIL_DEBOUNCE_MS = 200;
+
+/**
+ * Live-update the markdown preview in the detail view as the user types.
+ * Debounced to avoid excessive re-renders.
+ */
+delegate(detailContainer, 'input', '#task-md-input', () => {
+    clearTimeout(_mdDetailDebounce);
+    _mdDetailDebounce = setTimeout(() => {
+        try {
+            const mdInput = document.getElementById('task-md-input');
+            const preview = document.getElementById('task-md-preview');
+            if (mdInput && preview) {
+                preview.innerHTML = renderMarkdownPreview(mdInput.value);
+            }
+        } catch (error) {
+            console.error('listeners.js — markdown detail preview failed:', error);
+        }
+    }, MD_DETAIL_DEBOUNCE_MS);
+});
+
+/**
+ * Save markdown content on blur (same pattern as rich-text focusout).
+ */
+delegate(detailContainer, 'focusout', '#task-md-input', () => {
+    const { dateId, taskId } = getNotesTaskIds();
+    updateTasks(dateId, taskId, '', '', true);
+});
 
 // Context menu delegated listeners (replaces inline onclick handlers)
 document.getElementById('ctx-done-btn')?.addEventListener('click', () => doneSelectedList());

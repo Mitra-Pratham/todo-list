@@ -12,7 +12,7 @@ import {
     exportNotesJSON,
     importNotesJSON,
 } from "./notes-detail.js";
-import { replaceURLs, escapeHTML, isValidURL } from "./utils.js";
+import { replaceURLs, escapeHTML, isValidURL, sanitizeRichHTML } from "./utils.js";
 
 // ─── Cached DOM references ───────────────────────────────────
 
@@ -211,7 +211,7 @@ delegate('click', '#importPage', async () => {
         const file = await fileHandle.getFile();
         const fileName = fileHandle.name.slice(0, fileHandle.name.lastIndexOf('.'));
         const contents = await file.text();
-        createPage(contents, fileName);
+        createPage(sanitizeRichHTML(contents), fileName);
     } catch (error) {
         console.error('notes-listeners.js — file import failed:', error);
     }
@@ -356,6 +356,37 @@ delegate('keydown', '#notes-detail-area', (e) => {
         }
     } catch (error) {
         console.error('notes-listeners.js — keydown handler failed:', error);
+    }
+});
+
+// ─── Paste Sanitization ──────────────────────────────────────
+
+delegate('paste', '#notes-detail-area', (e) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const html = clipboardData.getData('text/html');
+    if (!html) return; // plain-text paste — let browser handle natively
+
+    e.preventDefault();
+    try {
+        const sanitized = sanitizeRichHTML(html);
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+
+        const temp = document.createElement('template');
+        temp.innerHTML = sanitized;
+        const fragment = temp.content;
+        range.insertNode(fragment);
+
+        // Collapse cursor to end of inserted content
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    } catch (error) {
+        console.error('notes-listeners.js — paste handler failed:', error);
     }
 });
 

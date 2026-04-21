@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="css/tailwind.css">
+    <link rel="stylesheet" href="css/main.css">
+    <script src="js/theme-toggle.js"></script>
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="manifest" href="site.webmanifest">
+</head>
+
+<body>
+
+    <!-- ─── Activity Bar (icon strip, far left) ─────────────────── -->
+    <aside class="activity-bar">
+        <div class="activity-bar-top">
+            <a href="index.html" class="activity-icon">
+                <i class="fa-solid fa-list-check"></i>
+                <span class="btn-title">To-Do List</span>
+            </a>
+            <a href="notes.html" class="activity-icon">
+                <i class="fa-solid fa-note-sticky"></i>
+                <span class="btn-title">Notes</span>
+            </a>
+            <a href="markdown.html" class="activity-icon active">
+                <i class="fa-solid fa-book-open"></i>
+                <span class="btn-title">Markdown Reader</span>
+            </a>
+        </div>
+        <div class="activity-bar-bottom">
+            <button id="theme-toggle-btn" class="activity-icon" type="button">
+                <i class="fa-solid fa-sun"></i>
+                <span class="btn-title">Toggle Theme</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ─── Main Layout ──────────────────────────────────────────── -->
+    <div id="app-shell">
+        <div class="md-toolbar">
+            <div class="flex items-center gap-2">
+                <h5 class="font-semibold text-sm">Markdown Reader</h5>
+                <div class="md-toolbar-actions">
+                    <button id="md-open-file" class="btn btn-lite-sm btn-no-bg-gray" type="button">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <span class="btn-title">Open .md File</span>
+                    </button>
+                    <button id="md-clear" class="btn btn-lite-sm btn-no-bg-gray" type="button">
+                        <i class="fa-solid fa-eraser"></i>
+                        <span class="btn-title">Clear</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="md-editor">
+            <div class="md-editor-pane">
+                <textarea id="md-input" placeholder="Type, paste, or drag & drop a file here..." spellcheck="false"></textarea>
+            </div>
+            <div class="md-preview-pane">
+                <div id="md-output" class="md-preview"></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script type="module" src="js/markdown.js"></script>
+
+</html>

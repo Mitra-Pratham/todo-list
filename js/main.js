@@ -3,7 +3,7 @@
 // ============================================================
 
 import { TodoService } from "./todo-service.js";
-import { replaceURLs, escapeHTML, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
+import { replaceURLs, escapeHTML, sanitizeRichHTML, hasRichContent, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
 import { sortByDate, createRTFToolbar } from "./notes-common.js";
 
 // ─── Globals (formerly in todo-variables.js) ─────────────────
@@ -108,6 +108,84 @@ function dateListChanged(prev, curr) {
 }
 
 /**
+ * Return the "How to Use" README as a Markdown string.
+ * Rendered via marked.js when no date lists exist.
+ * @returns {string}
+ */
+function getReadmeMarkdown() {
+    return `# Welcome to Todo List & Notes
+
+Your personal productivity workspace — tasks, notes, and a Markdown reader, all in one place.
+
+---
+
+## Getting Started
+
+### Create a Date List
+Click the **+** button in the activity bar (left side) to create a new date list.  
+Each date list groups tasks under a specific day.
+
+### Add Tasks
+Type a task name in the **Add Task** input field and press **Enter**.  
+Tasks start with a **To-Do** status by default.
+
+### Manage Tasks
+- **Complete** — click the circle icon next to a task
+- **Edit** — open the detail view, click the pencil icon to rename
+- **Delete** — open the detail view, click the trash icon
+- **Right-click** a task for quick actions (mark done, delete)
+- **Drag & drop** tasks between date lists
+
+---
+
+## Task Detail View
+Click the detail icon on any task to open the rich text editor.  
+You can add formatted notes with:
+
+| Shortcut | Action |
+|---|---|
+| \`Tab\` | Bullet list |
+| \`Ctrl + 9\` | Numbered list |
+| \`Ctrl + K\` | Insert hyperlink |
+| \`Ctrl + Shift + C\` | Code block |
+| \`Ctrl + B\` | Bold |
+| \`Ctrl + I\` | Italic |
+| \`Ctrl + U\` | Underline |
+
+Tasks with detail notes show a **highlighted** detail icon.
+
+---
+
+## Notes
+Click the **Notes** icon in the activity bar to switch to the Notes page.  
+Notes are organized into **sections** with multiple **pages** per section — great for longer-form content.
+
+---
+
+## Markdown Reader
+Click the **book** icon in the activity bar to open the Markdown Reader.  
+Paste or type Markdown on the left, and see a live-rendered preview on the right.  
+You can also **open .md files** from your computer.
+
+---
+
+## Import & Export
+- **Export CSV** — download all tasks as a CSV file
+- **Import CSV** — restore tasks from a previously exported CSV
+- Notes can be exported/imported as **JSON** from the Notes page
+
+---
+
+## Theme
+Click the **sun/moon** icon at the bottom of the activity bar to toggle between **dark** and **light** mode.
+
+---
+
+*Create your first date list to get started!*
+`;
+}
+
+/**
  * Render the main date-list view. Uses differential updates:
  * only re-renders date lists that have actually changed.
  * @param {Array} dateLists - array of date-list objects from IndexedDB
@@ -116,6 +194,24 @@ function renderDateList(dateLists) {
     taskArray = sortByDate(dateLists).reverse();
 
     const container = document.getElementById('date-list-container');
+
+    // Empty state — show README welcome card
+    if (taskArray.length === 0) {
+        previousDateListMap.clear();
+        try {
+            const readmeHtml = marked.parse(getReadmeMarkdown());
+            container.innerHTML = `<div class="readme-welcome"><div class="md-preview">${sanitizeRichHTML(readmeHtml)}</div></div>`;
+        } catch (err) {
+            console.error('main.js — README render failed:', err);
+            container.innerHTML = '<p class="p-4 text-secondary">Create a date list to get started.</p>';
+        }
+        return;
+    }
+
+    // Remove the welcome card if present
+    const welcomeEl = container.querySelector('.readme-welcome');
+    if (welcomeEl) welcomeEl.remove();
+
     const incomingIds = new Set(taskArray.map((dl) => dl.id));
 
     // Remove date lists that no longer exist
@@ -161,7 +257,7 @@ function renderDateList(dateLists) {
                 }
             }
 
-            previousDateListMap.set(dateItem.id, JSON.parse(JSON.stringify(dateItem)));
+            previousDateListMap.set(dateItem.id, structuredClone(dateItem));
         }
     }
 }
@@ -218,7 +314,7 @@ function buildDateListHTML(dateItem) {
 
 /**
  * Build the HTML for a single task list item.
- * @param {{id: string, name: string, statusCode: number, desc: string}} task
+ * @param {{id: string, name: string, statusCode: number, desc: string, descFormat?: string}} task
  * @returns {string}
  */
 function buildTaskHTML(task) {
@@ -226,7 +322,10 @@ function buildTaskHTML(task) {
     const completedClass = isTodo ? '' : 'completed-task';
     const checkIcon = isTodo ? 'fa-circle' : 'fa-circle-check';
     const checkLabel = isTodo ? 'Mark As Complete' : 'Move to To-Do';
-    const hasNotes = task.desc && task.desc.length > 1;
+    // For markdown tasks, check raw string length; for HTML tasks, use DOM-based hasRichContent
+    const hasNotes = task.descFormat === 'md'
+        ? (task.desc ?? '').trim().length > 0
+        : hasRichContent(task.desc);
 
     return `
         <li class="list-group-item flex items-center justify-between ${completedClass}"
@@ -269,6 +368,17 @@ function renderDateNav(dateLists) {
     const fingerprint = dateLists.map(d => `${d.id}:${countCompletedTasks(d.taskList)}/${d.taskList.length}`).join('|');
     if (fingerprint === _prevNavFingerprint) return;
     _prevNavFingerprint = fingerprint;
+
+    const container = document.getElementById('date-list-nav-container');
+
+    // Empty state
+    if (dateLists.length === 0) {
+        container.innerHTML = `<div class="p-3" style="font-size:.75rem; color:var(--text-on-dark-muted)">
+            <p class="font-semibold mb-1" style="color:var(--text-on-dark)">Get Started</p>
+            <p>Click the <strong>+</strong> button above to create your first date list.</p>
+        </div>`;
+        return;
+    }
 
     const sorted = sortByDate(dateLists).reverse();
     const todayStr = new Date().toLocaleDateString('fr-CA'); // "YYYY-MM-DD"
@@ -317,7 +427,6 @@ function renderDateNav(dateLists) {
         </div>`);
     }
 
-    const container = document.getElementById('date-list-nav-container');
     container.innerHTML = navParts.join('');
 }
 
@@ -346,19 +455,35 @@ function buildNavDayItem(dateItem, isToday) {
 
 // ─── Task Detail View ────────────────────────────────────────
 
+/** @type {'html'|'md'} Tracks the current format of the open detail view */
+let _activeDetailFormat = 'html';
+
 /**
  * Build the offcanvas detail view HTML for a task.
- * @param {{id: string, name: string, desc: string, dateName: string}} task
+ * Supports both rich-text (HTML) and markdown editing modes.
+ * @param {{id: string, name: string, desc: string, descFormat?: string, dateName: string}} task
  * @returns {string}
  */
 function renderTaskDetailHTML(task) {
-    return `
+    const format = task.descFormat ?? 'html';
+    _activeDetailFormat = format;
+    const isMd = format === 'md';
+    const toggleIcon = isMd ? 'fa-code' : 'fa-markdown';
+    const toggleLabel = isMd ? 'Switch to Rich Text' : 'Switch to Markdown';
+    // fa-markdown doesn't exist in FA — use fa-hashtag as visual stand-in for MD
+    const toggleIconClass = isMd ? 'fa-solid fa-align-left' : 'fa-brands fa-markdown';
+
+    const headerHTML = `
         <div id="task-detail-title-container" class="offcanvas-header border-b justify-between">
             <div class="flex flex-col task-detail-title w-full">
                 <h5 class="offcanvas-title">${escapeHTML(task.name)}</h5>
                 <p class="tasks-summary mb-0">${escapeHTML(task.dateName || '')}</p>
             </div>
             <div class="flex">
+                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-md-toggle" value="${task.id}" data-format="${format}">
+                    <i class="${toggleIconClass}"></i>
+                    <span class="btn-title">${toggleLabel}</span>
+                </button>
                 <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-edit" value="${task.id}">
                     <i class="fa-solid fa-pencil"></i>
                     <span class="btn-title">Edit</span>
@@ -372,7 +497,25 @@ function renderTaskDetailHTML(task) {
                     <span class="btn-title">Close</span>
                 </button>
             </div>
-        </div>
+        </div>`;
+
+    if (isMd) {
+        // Markdown mode: textarea editor + live preview
+        const renderedPreview = renderMarkdownPreview(task.desc ?? '');
+        return `${headerHTML}
+            <div id="task-detail-body" class="offcanvas-body">
+                <div class="task-detail-md-container">
+                    <textarea id="task-md-input" class="task-detail-md-editor" value="${task.id}"
+                        placeholder="Type Markdown here..." spellcheck="false">${escapeHTML(task.desc ?? '')}</textarea>
+                    <div id="task-md-preview" class="task-detail-md-preview md-preview">
+                        ${renderedPreview}
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    // Rich-text mode (default)
+    return `${headerHTML}
         <div id="task-detail-body" class="offcanvas-body">
             ${createRTFToolbar()}
             <div id="task-notes-area-parent">
@@ -381,6 +524,24 @@ function renderTaskDetailHTML(task) {
                 </section>
             </div>
         </div>`;
+}
+
+/**
+ * Render a markdown string to sanitized HTML for the detail preview.
+ * Returns placeholder text if the input is empty.
+ * @param {string} raw - raw markdown text
+ * @returns {string} sanitized HTML string
+ */
+function renderMarkdownPreview(raw) {
+    if (!raw.trim()) {
+        return '<p class="text-secondary" style="font-style:italic">Preview will appear here...</p>';
+    }
+    try {
+        return sanitizeRichHTML(marked.parse(raw));
+    } catch (err) {
+        console.error('main.js — renderMarkdownPreview failed:', err);
+        return '<p class="text-secondary">Error rendering markdown.</p>';
+    }
 }
 
 // ─── CRUD Operations ─────────────────────────────────────────
@@ -419,6 +580,7 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode) {
         name: replaceURLs(taskName),
         statusCode: statusCode || STATUS_TODO,
         desc: desc || '',
+        descFormat: 'html',
     };
 
     try {
@@ -468,8 +630,17 @@ async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails
     if (taskName !== '') updates.name = replaceURLs(taskName);
     if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
     if (taskDetails === true) {
-        const notesArea = document.getElementById('task-notes-area');
-        updates.desc = replaceURLs(notesArea ? notesArea.innerHTML : '');
+        if (_activeDetailFormat === 'md') {
+            // Markdown mode — save raw text from the textarea
+            const mdInput = document.getElementById('task-md-input');
+            updates.desc = mdInput?.value ?? '';
+            updates.descFormat = 'md';
+        } else {
+            // Rich-text mode — save sanitized innerHTML
+            const notesArea = document.getElementById('task-notes-area');
+            updates.desc = sanitizeRichHTML(notesArea?.innerHTML ?? '');
+            updates.descFormat = 'html';
+        }
     }
 
     try {
@@ -774,7 +945,8 @@ async function importCSV() {
                         id: taskId,
                         name: taskName,
                         statusCode: Number(statusCode) || 1001,
-                        desc: desc || '',
+                        desc: desc ? sanitizeRichHTML(desc) : '',
+                        descFormat: 'html',
                     });
                 }
             }
@@ -808,6 +980,7 @@ export {
     findTask,
     setMessageState,
     renderTaskDetailHTML,
+    renderMarkdownPreview,
     getSelectedList,
     deleteSelectedList,
     doneSelectedList,

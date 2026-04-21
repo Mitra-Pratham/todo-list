@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="css/tailwind.css">
     <link rel="stylesheet" href="css/main.css">
     <script src="js/theme-toggle.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -31,13 +30,13 @@
                 <i class="fa-solid fa-list-check"></i>
                 <span class="btn-title">To-Do List</span>
             </a>
-            <button id="calendar-toggle-btn" class="activity-icon" type="button">
-                <i class="fa-solid fa-calendar-days"></i>
-                <span class="btn-title">Calendar</span>
-            </button>
             <a href="notes.html" class="activity-icon">
                 <i class="fa-solid fa-note-sticky"></i>
                 <span class="btn-title">Notes</span>
+            </a>
+            <a href="markdown.html" class="activity-icon">
+                <i class="fa-solid fa-book-open"></i>
+                <span class="btn-title">Markdown Reader</span>
             </a>
             <button id="create-toggle-btn" class="activity-icon" type="button">
                 <i class="fa-solid fa-plus"></i>
@@ -88,38 +87,6 @@
             <div id="date-list-nav-container"></div>
             <div id="date-list-container"></div>
         </div>
-
-        <div id="calendar-container" class="hidden">
-            <div class="calendar-layout">
-                <div class="calendar-sidebar">
-                    <div id="mini-calendar"></div>
-                    <div class="calendar-filters mt-3">
-                        <h6 class="font-bold mb-2">Task Filters</h6>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="filter-all" checked>
-                            <label class="form-check-label" for="filter-all">
-                                <span class="filter-dot filter-dot-all"></span> View All
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="filter-todo" checked>
-                            <label class="form-check-label" for="filter-todo">
-                                <span class="filter-dot filter-dot-todo"></span> To-Do
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="filter-completed" checked>
-                            <label class="form-check-label" for="filter-completed">
-                                <span class="filter-dot filter-dot-completed"></span> Completed
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="calendar-main">
-                    <div id="fullcalendar"></div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <div class="offcanvas offcanvas-end" data-bs-scroll="true" data-bs-backdrop="false" id="task-detail-container">
@@ -142,7 +109,7 @@
     </div>
 
 </body>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
     crossorigin="anonymous"></script>
@@ -150,7 +117,6 @@
 <script type="module" src="js/main.js"></script>
 <script type="module" src="js/listeners.js"></script>
 <script type="module" src="js/drag.js"></script>
-<script type="module" src="js/calendar.js"></script>
 <script type="module" src="js/mcp-bridge.js"></script>
 
 </html>

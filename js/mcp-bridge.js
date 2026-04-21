@@ -13,7 +13,7 @@
 
 import { TodoService } from './todo-service.js';
 import { refreshUI } from './main.js';
-import { escapeHTML, replaceURLs, TASK_ID_OFFSET } from './utils.js';
+import { escapeHTML, replaceURLs, sanitizeRichHTML, TASK_ID_OFFSET } from './utils.js';
 
 // ─── Configuration ───────────────────────────────────────────
 
@@ -28,12 +28,19 @@ const STATUS_COMPLETED = 1004;
 // ─── Sanitization ────────────────────────────────────────────
 
 /**
- * Escape HTML + linkify URLs on an incoming plain-text string.
- * Mirrors what createTask/updateTasks do in main.js.
+ * Sanitize an incoming plain-text name: escape HTML, then linkify URLs.
+ * Mirrors what createTask/updateTasks do in main.js for task names.
  * @param {string} s
  * @returns {string}
  */
-const sanitize = (s) => replaceURLs(escapeHTML(String(s ?? '')));
+const sanitizeName = (s) => replaceURLs(escapeHTML(String(s ?? '')));
+
+/**
+ * Sanitize an incoming rich-HTML description through the allowlist walker.
+ * @param {string} s
+ * @returns {string}
+ */
+const sanitizeDesc = (s) => sanitizeRichHTML(String(s ?? ''));
 
 // ─── Handlers ────────────────────────────────────────────────
 // Each handler receives the params object and returns a JSON-serializable
@@ -76,9 +83,10 @@ const HANDLERS = Object.freeze({
 
         const newTask = {
             id: `Task-${dateId}-${Date.now()}`,
-            name: sanitize(name),
+            name: sanitizeName(name),
             statusCode: statusCode ?? STATUS_TODO,
-            desc: desc ? sanitize(desc) : '',
+            desc: desc ? sanitizeDesc(desc) : '',
+            descFormat: 'html',
         };
         await TodoService.addTask(dateId, newTask);
         await refreshUI();
@@ -87,8 +95,8 @@ const HANDLERS = Object.freeze({
 
     update_task: async ({ dateId, taskId, updates }) => {
         const sanitized = { ...updates };
-        if (typeof sanitized.name === 'string') sanitized.name = sanitize(sanitized.name);
-        if (typeof sanitized.desc === 'string') sanitized.desc = sanitize(sanitized.desc);
+        if (typeof sanitized.name === 'string') sanitized.name = sanitizeName(sanitized.name);
+        if (typeof sanitized.desc === 'string') sanitized.desc = sanitizeDesc(sanitized.desc);
 
         await TodoService.updateTask(dateId, taskId, sanitized);
         await refreshUI();
