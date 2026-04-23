@@ -2,6 +2,8 @@
 // utils.js — Shared utility helpers
 // ============================================================
 
+import { decodeHTMLEntities } from './task-helpers.js';
+
 // ─── JSDoc Type Definitions ──────────────────────────────────
 
 /**
@@ -55,6 +57,16 @@ export function escapeHTML(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+/**
+ * Decode HTML entities back to plain text.
+ * Useful for cleaning up older stored values that were escaped before save.
+ * @param {string} str
+ * @returns {string}
+ */
+export function decodeHTML(str) {
+    return decodeHTMLEntities(str ?? '');
 }
 
 /**

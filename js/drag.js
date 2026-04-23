@@ -2,7 +2,7 @@
 // drag.js — Drag-and-drop handlers for moving tasks between dates
 // ============================================================
 
-import { createTask, deleteTasks, findTask } from "./main.js";
+import { moveTaskBetweenDates } from "./main.js";
 import { DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
 
 /**
@@ -33,7 +33,7 @@ export function drag(event) {
  * and re-creates it under the target date.
  * @param {DragEvent} event
  */
-export function drop(event) {
+export async function drop(event) {
     event.preventDefault();
 
     try {
@@ -48,11 +48,7 @@ export function drop(event) {
         // Validate both IDs exist and are the same format (10-char date strings)
         if (!targetDateId || !sourceDateId || targetDateId.length !== sourceDateId.length) return;
 
-        const sourceTask = findTask(sourceDateId, sourceTaskId);
-        if (!sourceTask) return;
-
-        deleteTasks(sourceDateId, sourceTaskId);
-        createTask(sourceTask.name, targetDateId, '', sourceTask.desc, sourceTask.statusCode);
+        await moveTaskBetweenDates(sourceDateId, targetDateId, sourceTaskId);
     } catch (error) {
         console.error('drag.js — drop handler failed:', error);
     }
@@ -77,6 +73,8 @@ if (dateListContainer) {
 
     dateListContainer.addEventListener('drop', (e) => {
         const dropZone = e.target.closest('.drag-group-item');
-        if (dropZone && dateListContainer.contains(dropZone)) drop(e);
+        if (dropZone && dateListContainer.contains(dropZone)) {
+            void drop(e);
+        }
     });
 }

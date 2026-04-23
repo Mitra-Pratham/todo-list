@@ -5,6 +5,12 @@
 import { TodoService } from "./todo-service.js";
 import { replaceURLs, escapeHTML, sanitizeRichHTML, hasRichContent, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
 import { sortByDate, createRTFToolbar } from "./notes-common.js";
+import {
+    buildDateListsFromCsvRows,
+    buildTaskCsvRows,
+    normalizeDescFormat,
+    normalizeTaskName,
+} from "./task-helpers.js";
 
 // ─── Globals (formerly in todo-variables.js) ─────────────────
 let taskArray = [];
@@ -36,6 +42,11 @@ const STATUS_LABELS = {
 
 /** Bootstrap the app: load data from IndexedDB and render. */
 async function initApp() {
+    try {
+        await TodoService.normalizeLegacyTaskData();
+    } catch (error) {
+        console.error('main.js — legacy normalization failed:', error);
+    }
     await refreshUI();
 }
 
@@ -322,6 +333,7 @@ function buildTaskHTML(task) {
     const completedClass = isTodo ? '' : 'completed-task';
     const checkIcon = isTodo ? 'fa-circle' : 'fa-circle-check';
     const checkLabel = isTodo ? 'Mark As Complete' : 'Move to To-Do';
+    const displayName = replaceURLs(escapeHTML(decodeHTML(task.name ?? '')));
     // For markdown tasks, check raw string length; for HTML tasks, use DOM-based hasRichContent
     const hasNotes = task.descFormat === 'md'
         ? (task.desc ?? '').trim().length > 0
@@ -339,7 +351,7 @@ function buildTaskHTML(task) {
                     <i class="fa-solid fa-up-right-from-square"></i>
                     <span class="btn-title">View</span>
                 </button>
-                <span class="task-name w-3/4">${escapeHTML(task.name)}</span>
+                <span class="task-name w-3/4">${displayName}</span>
             </div>
             <div class="flex">
                 <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-edit" value="${task.id}">
@@ -476,7 +488,7 @@ function renderTaskDetailHTML(task) {
     const headerHTML = `
         <div id="task-detail-title-container" class="offcanvas-header border-b justify-between">
             <div class="flex flex-col task-detail-title w-full">
-                <h5 class="offcanvas-title">${escapeHTML(task.name)}</h5>
+                <h5 class="offcanvas-title">${replaceURLs(escapeHTML(decodeHTML(task.name ?? '')))}</h5>
                 <p class="tasks-summary mb-0">${escapeHTML(task.dateName || '')}</p>
             </div>
             <div class="flex">
@@ -569,7 +581,7 @@ async function deleteDateList(dateId) {
  * @param {string} desc
  * @param {number} [statusCode=1001]
  */
-async function createTask(taskName, dateId, inputElement, desc, statusCode) {
+async function createTask(taskName, dateId, inputElement, desc, statusCode, descFormat = 'html') {
     if (taskName === '') {
         setMessageState('failure', 'Task name cannot be empty.');
         return;
@@ -577,10 +589,10 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode) {
 
     const newTask = {
         id: `Task-${dateId}-${Date.now()}`,
-        name: replaceURLs(taskName),
+        name: normalizeTaskName(taskName),
         statusCode: statusCode || STATUS_TODO,
         desc: desc || '',
-        descFormat: 'html',
+        descFormat: normalizeDescFormat(descFormat),
     };
 
     try {
@@ -595,6 +607,31 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode) {
     } catch (error) {
         console.error("createTask — failed:", error);
         setMessageState('failure', 'Error creating task');
+    }
+}
+
+/**
+ * Move one task between date lists while preserving notes and metadata.
+ * The underlying service regenerates the task ID so it matches the target date.
+ * @param {string} sourceDateId
+ * @param {string} targetDateId
+ * @param {string} taskId
+ * @returns {Promise<boolean>}
+ */
+async function moveTaskBetweenDates(sourceDateId, targetDateId, taskId) {
+    try {
+        const result = await TodoService.moveTasks(sourceDateId, targetDateId, [taskId]);
+        if (!result.moved) {
+            setMessageState('failure', 'No matching task found to move.');
+            return false;
+        }
+        setMessageState('success', 'Task moved successfully!');
+        await refreshUI();
+        return true;
+    } catch (error) {
+        console.error("moveTaskBetweenDates — failed:", error);
+        setMessageState('failure', 'Error moving task');
+        return false;
     }
 }
 
@@ -627,7 +664,7 @@ async function deleteTasks(dateId, taskId) {
  */
 async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails) {
     const updates = {};
-    if (taskName !== '') updates.name = replaceURLs(taskName);
+    if (taskName !== '') updates.name = normalizeTaskName(taskName);
     if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
     if (taskDetails === true) {
         if (_activeDetailFormat === 'md') {
@@ -837,30 +874,26 @@ function csvEscape(value) {
 }
 
 /**
+ * Serialize CSV rows into an RFC 4180 string.
+ * @param {Array<Array<string | number>>} rows
+ * @returns {string}
+ */
+function stringifyCSV(rows) {
+    return rows
+        .map((row) => row.map((value) => csvEscape(value)).join(','))
+        .join('\n');
+}
+
+/**
  * Export all date lists + tasks as a CSV file download.
  */
 function exportCSV() {
-    const rows = ['date_id,date_name,task_id,task_name,status_code,description'];
-
-    for (const dl of taskArray) {
-        if (!dl.taskList || dl.taskList.length === 0) {
-            rows.push([csvEscape(dl.id), csvEscape(dl.name), '', '', '', ''].join(','));
-        } else {
-            for (const t of dl.taskList) {
-                rows.push([
-                    csvEscape(dl.id), csvEscape(dl.name),
-                    csvEscape(t.id), csvEscape(t.name),
-                    csvEscape(t.statusCode), csvEscape(t.desc),
-                ].join(','));
-            }
-        }
-    }
-
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const csvRows = buildTaskCsvRows(taskArray);
+    const blob = new Blob([stringifyCSV(csvRows)], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `todo-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `todo-backup-${new Date().toLocaleDateString('fr-CA')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     setMessageState('success', 'CSV exported successfully!');
@@ -925,39 +958,23 @@ async function importCSV() {
                 return;
             }
 
-            // Skip header row, group by date_id
-            const dateListMap = new Map();
-            for (let i = 1; i < rows.length; i++) {
-                const [dateId, dateName, taskId, taskName, statusCode, desc] = rows[i];
-                if (!dateId) continue;
-
-                if (!dateListMap.has(dateId)) {
-                    dateListMap.set(dateId, {
-                        id: dateId,
-                        name: dateName || dateId,
-                        taskList: [],
-                        statusCode: 1001,
-                    });
-                }
-
-                if (taskId && taskName) {
-                    dateListMap.get(dateId).taskList.push({
-                        id: taskId,
-                        name: taskName,
-                        statusCode: Number(statusCode) || 1001,
-                        desc: desc ? sanitizeRichHTML(desc) : '',
-                        descFormat: 'html',
-                    });
-                }
-            }
+            const dateLists = buildDateListsFromCsvRows(rows).map((dateList) => ({
+                ...dateList,
+                taskList: dateList.taskList.map((task) => ({
+                    ...task,
+                    desc: normalizeDescFormat(task.descFormat) === 'html'
+                        ? sanitizeRichHTML(task.desc)
+                        : task.desc,
+                })),
+            }));
 
             // Write each date list to IndexedDB
-            for (const dateList of dateListMap.values()) {
+            for (const dateList of dateLists) {
                 await TodoService.saveDateList(dateList);
             }
 
             await refreshUI();
-            setMessageState('success', `Imported ${dateListMap.size} date list(s) successfully!`);
+            setMessageState('success', `Imported ${dateLists.length} date list(s) successfully!`);
         } catch (error) {
             console.error('importCSV — failed:', error);
             setMessageState('failure', 'Error importing CSV file');
@@ -986,6 +1003,7 @@ export {
     doneSelectedList,
     markAllAsDone,
     createDateList,
+    moveTaskBetweenDates,
     exportCSV,
     importCSV,
     refreshUI,

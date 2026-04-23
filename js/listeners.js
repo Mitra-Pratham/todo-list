@@ -27,6 +27,7 @@ import {
 import { TodoService } from "./todo-service.js";
 import { replaceURLs, escapeHTML, isValidURL, sanitizeRichHTML, DATE_ID_START, DATE_ID_END, TASK_ID_OFFSET } from "./utils.js";
 import { createRTFToolbar } from "./notes-common.js";
+import { formatDateListName, getLocalDateInputValue } from "./task-helpers.js";
 
 //--------------------Cached DOM references---------------------
 
@@ -69,12 +70,12 @@ if (createToggleBtn && createPopover) {
 }
 
 //Creating and setting date lists
-dateInput.value = new Date().toISOString().slice(0, 10);
+dateInput.value = getLocalDateInputValue();
 
 //+ button to create the date list
 document.getElementById('todo-date-submit').addEventListener('click', () => {
     const inputDate = dateInput.value;
-    const inputDateName = new Date(inputDate).toLocaleDateString('en-us', { weekday: "long", year: "numeric", month: "short", day: "numeric" });
+    const inputDateName = formatDateListName(inputDate);
 
     const alreadyExists = taskArray.some((dateItem) => dateItem.id === inputDate);
     if (!alreadyExists) {

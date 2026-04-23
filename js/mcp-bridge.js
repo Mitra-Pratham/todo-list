@@ -13,7 +13,8 @@
 
 import { TodoService } from './todo-service.js';
 import { refreshUI } from './main.js';
-import { escapeHTML, replaceURLs, sanitizeRichHTML, TASK_ID_OFFSET } from './utils.js';
+import { sanitizeRichHTML, TASK_ID_OFFSET } from './utils.js';
+import { formatDateListName, normalizeTaskName } from './task-helpers.js';
 
 // ─── Configuration ───────────────────────────────────────────
 
@@ -27,13 +28,8 @@ const STATUS_COMPLETED = 1004;
 
 // ─── Sanitization ────────────────────────────────────────────
 
-/**
- * Sanitize an incoming plain-text name: escape HTML, then linkify URLs.
- * Mirrors what createTask/updateTasks do in main.js for task names.
- * @param {string} s
- * @returns {string}
- */
-const sanitizeName = (s) => replaceURLs(escapeHTML(String(s ?? '')));
+/** Normalize an incoming plain-text task name for storage. */
+const sanitizeName = (s) => normalizeTaskName(String(s ?? ''));
 
 /**
  * Sanitize an incoming rich-HTML description through the allowlist walker.
@@ -77,10 +73,7 @@ const HANDLERS = Object.freeze({
         return `Created date list '${dateId}'`;
     },
 
-    add_task: async ({ dateId, name, desc, statusCode }) => {
-        const existing = await TodoService.getDateList(dateId);
-        if (!existing) throw new Error(`Date list '${dateId}' does not exist`);
-
+    ensure_date_list_and_add_task: async ({ dateId, dateName, name, desc, statusCode }) => {
         const newTask = {
             id: `Task-${dateId}-${Date.now()}`,
             name: sanitizeName(name),
@@ -88,9 +81,13 @@ const HANDLERS = Object.freeze({
             desc: desc ? sanitizeDesc(desc) : '',
             descFormat: 'html',
         };
-        await TodoService.addTask(dateId, newTask);
+        const result = await TodoService.ensureDateListAndAddTask(
+            dateId,
+            newTask,
+            String(dateName || formatDateListName(dateId))
+        );
         await refreshUI();
-        return { added: newTask };
+        return { added: result.task, dateListCreated: result.dateListCreated };
     },
 
     update_task: async ({ dateId, taskId, updates }) => {
@@ -133,33 +130,9 @@ const HANDLERS = Object.freeze({
      * deletes from the source in one batch write.
      */
     move_tasks: async ({ sourceDateId, targetDateId, taskIds }) => {
-        const source = await TodoService.getDateList(sourceDateId);
-        const target = await TodoService.getDateList(targetDateId);
-        if (!source) throw new Error(`Source date list '${sourceDateId}' does not exist`);
-        if (!target) throw new Error(`Target date list '${targetDateId}' does not exist`);
-
-        const idSet = new Set(taskIds);
-        const movingTasks = source.taskList.filter((t) => idSet.has(t.id.slice(TASK_ID_OFFSET)));
-        if (movingTasks.length === 0) return 'No matching tasks found in source';
-
-        // Clone with fresh IDs under the target date so task id stays aligned
-        // with its parent date list (matches drag.js semantics).
-        const now = Date.now();
-        const newTasks = movingTasks.map((t, i) => ({
-            ...t,
-            id: `Task-${targetDateId}-${now + i}`,
-        }));
-
-        target.taskList.push(...newTasks);
-
-        // Parallel writes — the two date lists are independent keys in IndexedDB.
-        await Promise.all([
-            TodoService.saveDateList(target),
-            TodoService.batchDeleteTasks(sourceDateId, [...idSet]),
-        ]);
+        const result = await TodoService.moveTasks(sourceDateId, targetDateId, taskIds);
         await refreshUI();
-
-        return { moved: newTasks.length, sourceDateId, targetDateId };
+        return result.moved === 0 ? 'No matching tasks found in source' : result;
     },
 });
 
