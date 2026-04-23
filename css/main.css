@@ -621,6 +621,16 @@ input:hover {
   }
 }
 
+.date-item .task-name a {
+  color: var(--link-color);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.date-item .task-name a:hover {
+  color: var(--color-primary-hover);
+}
+
 /* ─── Completed Tasks ────────────────────────────────────────── */
 .completed-task .task-name {
   text-decoration: line-through;
