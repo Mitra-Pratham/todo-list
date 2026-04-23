@@ -333,7 +333,7 @@ function buildTaskHTML(task) {
     const completedClass = isTodo ? '' : 'completed-task';
     const checkIcon = isTodo ? 'fa-circle' : 'fa-circle-check';
     const checkLabel = isTodo ? 'Mark As Complete' : 'Move to To-Do';
-    const displayName = replaceURLs(escapeHTML(decodeHTML(task.name ?? '')));
+    const displayName = replaceURLs(escapeHTML(normalizeTaskName(task.name ?? '')));
     // For markdown tasks, check raw string length; for HTML tasks, use DOM-based hasRichContent
     const hasNotes = task.descFormat === 'md'
         ? (task.desc ?? '').trim().length > 0
@@ -488,7 +488,7 @@ function renderTaskDetailHTML(task) {
     const headerHTML = `
         <div id="task-detail-title-container" class="offcanvas-header border-b justify-between">
             <div class="flex flex-col task-detail-title w-full">
-                <h5 class="offcanvas-title">${replaceURLs(escapeHTML(decodeHTML(task.name ?? '')))}</h5>
+                <h5 class="offcanvas-title">${replaceURLs(escapeHTML(normalizeTaskName(task.name ?? '')))}</h5>
                 <p class="tasks-summary mb-0">${escapeHTML(task.dateName || '')}</p>
             </div>
             <div class="flex">

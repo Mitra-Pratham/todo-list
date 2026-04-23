@@ -2,6 +2,8 @@
 // refresh-worker.js — Auto-refresh the page after 24 h of inactivity
 // ============================================================
 
+import { getLocalDateInputValue } from './task-helpers.js';
+
 /** localStorage key that stores the last-visit epoch timestamp */
 const LAST_VISIT_KEY = 'last-visit-timestamp';
 
@@ -16,7 +18,7 @@ window.addEventListener('load', () => {
     const nowMs = Date.now().toString();
     localStorage.setItem(LAST_VISIT_KEY, nowMs);
 
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = getLocalDateInputValue();
     const dateInput = document.getElementById('todo-date-input');
     if (dateInput) dateInput.value = todayISO;
 });

@@ -5,6 +5,7 @@
 import { TodoService } from "./todo-service.js";
 import { escapeHTML, sanitizeRichHTML } from "./utils.js";
 import { createRTFToolbar } from "./notes-common.js";
+import { getLocalDateInputValue } from "./task-helpers.js";
 
 /** Reusable CSS class string for small toolbar buttons */
 const TOOLBAR_BTN_CLASSES = 'btn btn-lite-sm btn-no-bg-gray';
@@ -310,7 +311,7 @@ function exportNotesJSON() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `notes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `notes-backup-${getLocalDateInputValue()}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }
