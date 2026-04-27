@@ -47,7 +47,7 @@ let debounceTimer = null;
 function renderPreview() {
     const raw = mdInput.value;
     if (!raw.trim()) {
-        mdOutput.innerHTML = '<p class="text-secondary" style="font-style:italic">Preview will appear here...</p>';
+        mdOutput.innerHTML = '<p class="text-secondary md-placeholder">Preview will appear here...</p>';
         return;
     }
     try {

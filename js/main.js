@@ -290,7 +290,7 @@ function buildDateListHTML(dateItem) {
     const tasksMarkup = dateItem.taskList.map((task) => buildTaskHTML(task)).join('');
 
     return `
-        <div id="date-item-${dateItem.id}" class="mb-4 p-3 date-item">
+        <div id="date-item-${dateItem.id}" class="mb-4 p-3 date-item${allDone ? ' date-item-done' : ''}">
             <div class="flex justify-between items-start">
                 <div class="flex items-start">
                     <div class="grid">
@@ -386,8 +386,8 @@ function renderDateNav(dateLists) {
 
     // Empty state
     if (dateLists.length === 0) {
-        container.innerHTML = `<div class="p-3" style="font-size:.75rem; color:var(--text-on-dark-muted)">
-            <p class="font-semibold mb-1" style="color:var(--text-on-dark)">Get Started</p>
+        container.innerHTML = `<div class="p-3 sidebar-empty-state">
+            <p class="font-semibold mb-1 sidebar-empty-state-title">Get Started</p>
             <p>Click the <strong>+</strong> button above to create your first date list.</p>
         </div>`;
         return;
@@ -455,7 +455,7 @@ function buildNavDayItem(dateItem, isToday) {
     const incomplete = completed !== total;
 
     return `
-        <div class="flex items-center border-l ml-1" style="border-color:var(--surface-dark-border)">
+        <div class="flex items-center border-l ml-1 nav-day-border">
             <a class="nav-sidebar-day ${isToday ? 'btn-no-bg-gray-active' : ''}"
                href="#date-item-${dateItem.id}">
                 ${dateItem.name}

@@ -68,7 +68,7 @@ export function createShortcuts() {
  */
 export function createButtons(items, showSwatch = false) {
     const renderSwatch = (value) =>
-        `<div value="${value}" style="border:1px solid var(--border-dark); border-radius:2px; height:14px; width:14px; background-color:${value}"></div>`;
+        `<div class="color-swatch" value="${value}" style="background-color:${value}"></div>`;
 
     return items
         .map((item) =>
