@@ -79,7 +79,6 @@ const HANDLERS = Object.freeze({
             name: sanitizeName(name),
             statusCode: statusCode ?? STATUS_TODO,
             desc: desc ? sanitizeDesc(desc) : '',
-            descFormat: 'html',
         };
         const result = await TodoService.ensureDateListAndAddTask(
             dateId,

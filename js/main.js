@@ -8,9 +8,11 @@ import { sortByDate, createRTFToolbar } from "./notes-common.js";
 import {
     buildDateListsFromCsvRows,
     buildTaskCsvRows,
-    normalizeDescFormat,
+    stringifyCSV,
     normalizeTaskName,
+    STATUS_TODO,
 } from "./task-helpers.js";
+import { initAutoBackup } from "./backup-scheduler.js";
 
 // ─── Globals (formerly in todo-variables.js) ─────────────────
 let taskArray = [];
@@ -23,7 +25,7 @@ const bsOffcanvas = new bootstrap.Offcanvas('#task-detail-container');
 const previousDateListMap = new Map();
 
 // ─── Status Code Constants ───────────────────────────────────
-const STATUS_TODO      = 1001;
+// STATUS_TODO is imported from task-helpers.js (shared with todo-service.js)
 const STATUS_ONGOING   = 1002;
 const STATUS_BLOCKED   = 1003;
 const STATUS_COMPLETED = 1004;
@@ -48,6 +50,7 @@ async function initApp() {
         console.error('main.js — legacy normalization failed:', error);
     }
     await refreshUI();
+    await initAutoBackup();
 }
 
 /**
@@ -325,7 +328,7 @@ function buildDateListHTML(dateItem) {
 
 /**
  * Build the HTML for a single task list item.
- * @param {{id: string, name: string, statusCode: number, desc: string, descFormat?: string}} task
+ * @param {{id: string, name: string, statusCode: number, desc: string}} task
  * @returns {string}
  */
 function buildTaskHTML(task) {
@@ -334,10 +337,8 @@ function buildTaskHTML(task) {
     const checkIcon = isTodo ? 'fa-circle' : 'fa-circle-check';
     const checkLabel = isTodo ? 'Mark As Complete' : 'Move to To-Do';
     const displayName = replaceURLs(escapeHTML(normalizeTaskName(task.name ?? '')));
-    // For markdown tasks, check raw string length; for HTML tasks, use DOM-based hasRichContent
-    const hasNotes = task.descFormat === 'md'
-        ? (task.desc ?? '').trim().length > 0
-        : hasRichContent(task.desc);
+    // Detect whether the task has rich-text notes for the detail-icon highlight
+    const hasNotes = hasRichContent(task.desc);
 
     return `
         <li class="list-group-item flex items-center justify-between ${completedClass}"
@@ -467,35 +468,20 @@ function buildNavDayItem(dateItem, isToday) {
 
 // ─── Task Detail View ────────────────────────────────────────
 
-/** @type {'html'|'md'} Tracks the current format of the open detail view */
-let _activeDetailFormat = 'html';
-
 /**
  * Build the offcanvas detail view HTML for a task.
- * Supports both rich-text (HTML) and markdown editing modes.
- * @param {{id: string, name: string, desc: string, descFormat?: string, dateName: string}} task
+ * Renders the rich-text (contenteditable) editor with RTF toolbar.
+ * @param {{id: string, name: string, desc: string, dateName: string}} task
  * @returns {string}
  */
 function renderTaskDetailHTML(task) {
-    const format = task.descFormat ?? 'html';
-    _activeDetailFormat = format;
-    const isMd = format === 'md';
-    const toggleIcon = isMd ? 'fa-code' : 'fa-markdown';
-    const toggleLabel = isMd ? 'Switch to Rich Text' : 'Switch to Markdown';
-    // fa-markdown doesn't exist in FA — use fa-hashtag as visual stand-in for MD
-    const toggleIconClass = isMd ? 'fa-solid fa-align-left' : 'fa-brands fa-markdown';
-
-    const headerHTML = `
+    return `
         <div id="task-detail-title-container" class="offcanvas-header border-b justify-between">
             <div class="flex flex-col task-detail-title w-full">
                 <h5 class="offcanvas-title">${replaceURLs(escapeHTML(normalizeTaskName(task.name ?? '')))}</h5>
                 <p class="tasks-summary mb-0">${escapeHTML(task.dateName || '')}</p>
             </div>
             <div class="flex">
-                <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-md-toggle" value="${task.id}" data-format="${format}">
-                    <i class="${toggleIconClass}"></i>
-                    <span class="btn-title">${toggleLabel}</span>
-                </button>
                 <button type="button" class="btn btn-lite-sm btn-no-bg-gray ml-2 todo-task-edit" value="${task.id}">
                     <i class="fa-solid fa-pencil"></i>
                     <span class="btn-title">Edit</span>
@@ -509,25 +495,7 @@ function renderTaskDetailHTML(task) {
                     <span class="btn-title">Close</span>
                 </button>
             </div>
-        </div>`;
-
-    if (isMd) {
-        // Markdown mode: textarea editor + live preview
-        const renderedPreview = renderMarkdownPreview(task.desc ?? '');
-        return `${headerHTML}
-            <div id="task-detail-body" class="offcanvas-body">
-                <div class="task-detail-md-container">
-                    <textarea id="task-md-input" class="task-detail-md-editor" value="${task.id}"
-                        placeholder="Type Markdown here..." spellcheck="false">${escapeHTML(task.desc ?? '')}</textarea>
-                    <div id="task-md-preview" class="task-detail-md-preview md-preview">
-                        ${renderedPreview}
-                    </div>
-                </div>
-            </div>`;
-    }
-
-    // Rich-text mode (default)
-    return `${headerHTML}
+        </div>
         <div id="task-detail-body" class="offcanvas-body">
             ${createRTFToolbar()}
             <div id="task-notes-area-parent">
@@ -536,24 +504,6 @@ function renderTaskDetailHTML(task) {
                 </section>
             </div>
         </div>`;
-}
-
-/**
- * Render a markdown string to sanitized HTML for the detail preview.
- * Returns placeholder text if the input is empty.
- * @param {string} raw - raw markdown text
- * @returns {string} sanitized HTML string
- */
-function renderMarkdownPreview(raw) {
-    if (!raw.trim()) {
-        return '<p class="text-secondary" style="font-style:italic">Preview will appear here...</p>';
-    }
-    try {
-        return sanitizeRichHTML(marked.parse(raw));
-    } catch (err) {
-        console.error('main.js — renderMarkdownPreview failed:', err);
-        return '<p class="text-secondary">Error rendering markdown.</p>';
-    }
 }
 
 // ─── CRUD Operations ─────────────────────────────────────────
@@ -581,7 +531,7 @@ async function deleteDateList(dateId) {
  * @param {string} desc
  * @param {number} [statusCode=1001]
  */
-async function createTask(taskName, dateId, inputElement, desc, statusCode, descFormat = 'html') {
+async function createTask(taskName, dateId, inputElement, desc, statusCode) {
     if (taskName === '') {
         setMessageState('failure', 'Task name cannot be empty.');
         return;
@@ -592,7 +542,6 @@ async function createTask(taskName, dateId, inputElement, desc, statusCode, desc
         name: normalizeTaskName(taskName),
         statusCode: statusCode || STATUS_TODO,
         desc: desc || '',
-        descFormat: normalizeDescFormat(descFormat),
     };
 
     try {
@@ -667,17 +616,9 @@ async function updateTasks(dateId, taskId, taskName, taskStatusCode, taskDetails
     if (taskName !== '') updates.name = normalizeTaskName(taskName);
     if (taskStatusCode !== '') updates.statusCode = taskStatusCode;
     if (taskDetails === true) {
-        if (_activeDetailFormat === 'md') {
-            // Markdown mode — save raw text from the textarea
-            const mdInput = document.getElementById('task-md-input');
-            updates.desc = mdInput?.value ?? '';
-            updates.descFormat = 'md';
-        } else {
-            // Rich-text mode — save sanitized innerHTML
-            const notesArea = document.getElementById('task-notes-area');
-            updates.desc = sanitizeRichHTML(notesArea?.innerHTML ?? '');
-            updates.descFormat = 'html';
-        }
+        // Save sanitized rich-text HTML from the contenteditable area
+        const notesArea = document.getElementById('task-notes-area');
+        updates.desc = sanitizeRichHTML(notesArea?.innerHTML ?? '');
     }
 
     try {
@@ -862,29 +803,6 @@ async function markAllAsDone(dateId) {
 // ─── CSV Import / Export ─────────────────────────────────────
 
 /**
- * RFC 4180 CSV field escaping.
- * @param {*} value
- * @returns {string}
- */
-function csvEscape(value) {
-    const s = String(value ?? '');
-    return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? '"' + s.replace(/"/g, '""') + '"'
-        : s;
-}
-
-/**
- * Serialize CSV rows into an RFC 4180 string.
- * @param {Array<Array<string | number>>} rows
- * @returns {string}
- */
-function stringifyCSV(rows) {
-    return rows
-        .map((row) => row.map((value) => csvEscape(value)).join(','))
-        .join('\n');
-}
-
-/**
  * Export all date lists + tasks as a CSV file download.
  */
 function exportCSV() {
@@ -958,13 +876,12 @@ async function importCSV() {
                 return;
             }
 
+            // Sanitize all imported task descriptions through the HTML allowlist
             const dateLists = buildDateListsFromCsvRows(rows).map((dateList) => ({
                 ...dateList,
                 taskList: dateList.taskList.map((task) => ({
                     ...task,
-                    desc: normalizeDescFormat(task.descFormat) === 'html'
-                        ? sanitizeRichHTML(task.desc)
-                        : task.desc,
+                    desc: sanitizeRichHTML(task.desc),
                 })),
             }));
 
@@ -997,7 +914,6 @@ export {
     findTask,
     setMessageState,
     renderTaskDetailHTML,
-    renderMarkdownPreview,
     getSelectedList,
     deleteSelectedList,
     doneSelectedList,

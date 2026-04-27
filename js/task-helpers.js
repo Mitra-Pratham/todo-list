@@ -2,7 +2,11 @@
 // task-helpers.js — Pure task/date/CSV helpers shared by UI and tests
 // ============================================================
 
-/** @typedef {'html' | 'md'} TaskDescFormat */
+// ─── Status Code Constants ───────────────────────────────────
+// Defined here (not main.js) so todo-service.js can import without circular deps.
+
+/** Default status for new tasks and date lists */
+export const STATUS_TODO = 1001;
 
 /** CSV header for task export/import. */
 export const TASK_CSV_HEADERS = Object.freeze([
@@ -12,7 +16,6 @@ export const TASK_CSV_HEADERS = Object.freeze([
     'task_name',
     'status_code',
     'description',
-    'desc_format',
 ]);
 
 /**
@@ -55,16 +58,8 @@ export function normalizeTaskName(name) {
 }
 
 /**
- * Normalize task description format. Unknown values fall back to HTML.
- * @param {unknown} descFormat
- * @returns {TaskDescFormat}
- */
-export function normalizeDescFormat(descFormat) {
-    return descFormat === 'md' ? 'md' : 'html';
-}
-
-/**
  * Normalize a task record while preserving user content.
+ * Repairs encoded entity names and ensures desc is always a string.
  * @param {object} task
  * @returns {object}
  */
@@ -73,7 +68,6 @@ export function normalizeTaskRecord(task) {
         ...task,
         name: normalizeTaskName(task?.name),
         desc: String(task?.desc ?? ''),
-        descFormat: normalizeDescFormat(task?.descFormat),
     };
 }
 
@@ -142,14 +136,36 @@ export function buildTaskCsvRows(dateLists) {
                 dateList.name,
                 normalized.id,
                 normalized.name,
-                normalized.statusCode ?? 1001,
+                normalized.statusCode ?? STATUS_TODO,
                 normalized.desc,
-                normalized.descFormat,
             ]);
         }
     }
 
     return rows;
+}
+
+/**
+ * RFC 4180 CSV field escaping.
+ * @param {*} value
+ * @returns {string}
+ */
+export function csvEscape(value) {
+    const s = String(value ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+}
+
+/**
+ * Serialize CSV rows into an RFC 4180 string.
+ * @param {Array<Array<string | number>>} rows
+ * @returns {string}
+ */
+export function stringifyCSV(rows) {
+    return rows
+        .map((row) => row.map((v) => csvEscape(v)).join(','))
+        .join('\n');
 }
 
 /**
@@ -175,16 +191,13 @@ export function buildDateListsFromCsvRows(rows) {
         const taskName = hasNamedHeader ? row[headerMap.get('task_name')] : row[3];
         const statusCode = hasNamedHeader ? row[headerMap.get('status_code')] : row[4];
         const desc = hasNamedHeader ? row[headerMap.get('description')] : row[5];
-        const descFormat = hasNamedHeader && headerMap.has('desc_format')
-            ? row[headerMap.get('desc_format')]
-            : 'html';
 
         if (!dateLists.has(dateId)) {
             dateLists.set(dateId, {
                 id: dateId,
                 name: dateName || formatDateListName(dateId),
                 taskList: [],
-                statusCode: 1001,
+                statusCode: STATUS_TODO,
             });
         }
 
@@ -192,9 +205,8 @@ export function buildDateListsFromCsvRows(rows) {
             dateLists.get(dateId).taskList.push({
                 id: taskId,
                 name: normalizeTaskName(taskName),
-                statusCode: Number(statusCode) || 1001,
+                statusCode: Number(statusCode) || STATUS_TODO,
                 desc: String(desc ?? ''),
-                descFormat: normalizeDescFormat(descFormat),
             });
         }
     }

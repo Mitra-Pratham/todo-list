@@ -6,8 +6,8 @@ import { TASK_ID_OFFSET } from "./utils.js";
 import {
     cloneTaskForDate,
     formatDateListName,
-    normalizeDescFormat,
     normalizeTaskRecord,
+    STATUS_TODO,
 } from "./task-helpers.js";
 
 /** IndexedDB database / store names */
@@ -17,12 +17,23 @@ const NOTES_DB_NAME = 'NotesDB';
 const NOTES_STORE_NAME = 'notesData';
 
 /**
- * Open (or create) an IndexedDB database with a single object store.
+ * Cached IDB connections — one per database name.
+ * Prevents opening a new connection on every operation, which can exhaust
+ * the browser's per-origin connection pool during burst writes.
+ * @type {Map<string, IDBDatabase>}
+ */
+const _dbCache = new Map();
+
+/**
+ * Open (or reuse) an IndexedDB database with a single object store.
+ * Connections are cached per dbName so subsequent calls skip the open handshake.
  * @param {string} dbName
  * @param {string} storeName
  * @returns {Promise<IDBDatabase>}
  */
 function openDB(dbName, storeName) {
+    if (_dbCache.has(dbName)) return Promise.resolve(_dbCache.get(dbName));
+
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(dbName, 1);
         request.onupgradeneeded = (e) => {
@@ -31,7 +42,11 @@ function openDB(dbName, storeName) {
                 db.createObjectStore(storeName, { keyPath: 'id' });
             }
         };
-        request.onsuccess = (e) => resolve(e.target.result);
+        request.onsuccess = (e) => {
+            const db = e.target.result;
+            _dbCache.set(dbName, db);
+            resolve(db);
+        };
         request.onerror = (e) => reject(e.target.error);
     });
 }
@@ -266,17 +281,20 @@ export const TodoService = {
     },
 
     /**
-     * Add a single task to a date list (read-modify-write).
+     * Add a single task to a date list.
+     * Uses a single readwrite transaction to avoid RMW race conditions.
      * @param {string} dateId
      * @param {{id: string, name: string, statusCode: number, desc: string}} task
      */
     async addTask(dateId, task) {
         try {
-            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
-            if (dateList) {
+            await withTasksStore(async (store) => {
+                const dateList = await getFromStore(store, dateId);
+                if (!dateList) throw new Error(`Date list '${dateId}' not found`);
+
                 dateList.taskList.push(normalizeTaskRecord(task));
-                await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
-            }
+                await putToStore(store, dateList);
+            });
         } catch (error) {
             console.error("TodoService.addTask — failed:", error);
             throw error;
@@ -284,24 +302,30 @@ export const TodoService = {
     },
 
     /**
-     * Update fields on a single task inside a date list (read-modify-write).
+     * Update fields on a single task inside a date list.
+     * Uses a single readwrite transaction to avoid RMW race conditions.
      * @param {string} dateId
      * @param {string} taskId - the suffix portion of the full task ID
      * @param {Object} updates - key/value pairs to merge into the task
      */
     async updateTask(dateId, taskId, updates) {
         try {
-            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
-            if (dateList) {
-                const taskIndex = dateList.taskList.findIndex((t) => t.id.endsWith(taskId));
+            await withTasksStore(async (store) => {
+                const dateList = await getFromStore(store, dateId);
+                if (!dateList) throw new Error(`Date list '${dateId}' not found`);
+
+                // Exact match via slice — avoids false positives from endsWith
+                const taskIndex = dateList.taskList.findIndex(
+                    (t) => t.id.slice(TASK_ID_OFFSET) === taskId
+                );
                 if (taskIndex !== -1) {
                     dateList.taskList[taskIndex] = normalizeTaskRecord({
                         ...dateList.taskList[taskIndex],
                         ...updates,
                     });
-                    await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
+                    await putToStore(store, dateList);
                 }
-            }
+            });
         } catch (error) {
             console.error("TodoService.updateTask — failed:", error);
             throw error;
@@ -309,17 +333,23 @@ export const TodoService = {
     },
 
     /**
-     * Delete a single task from a date list (read-modify-write).
+     * Delete a single task from a date list.
+     * Uses a single readwrite transaction to avoid RMW race conditions.
      * @param {string} dateId
      * @param {string} taskId - the suffix portion of the full task ID
      */
     async deleteTask(dateId, taskId) {
         try {
-            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
-            if (dateList) {
-                dateList.taskList = dateList.taskList.filter((t) => !t.id.endsWith(taskId));
-                await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
-            }
+            await withTasksStore(async (store) => {
+                const dateList = await getFromStore(store, dateId);
+                if (!dateList) throw new Error(`Date list '${dateId}' not found`);
+
+                // Exact match via slice — consistent with the rest of the codebase
+                dateList.taskList = dateList.taskList.filter(
+                    (t) => t.id.slice(TASK_ID_OFFSET) !== taskId
+                );
+                await putToStore(store, dateList);
+            });
         } catch (error) {
             console.error("TodoService.deleteTask — failed:", error);
             throw error;
@@ -337,20 +367,25 @@ export const TodoService = {
         if (!taskUpdates?.length) return;
 
         try {
-            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
-            if (!dateList) return;
+            await withTasksStore(async (store) => {
+                const dateList = await getFromStore(store, dateId);
+                if (!dateList) return;
 
-            for (const { taskId, updates } of taskUpdates) {
-                const index = dateList.taskList.findIndex((t) => t.id.endsWith(taskId));
-                if (index !== -1) {
-                    dateList.taskList[index] = normalizeTaskRecord({
-                        ...dateList.taskList[index],
-                        ...updates,
-                    });
+                for (const { taskId, updates } of taskUpdates) {
+                    // Exact match via slice — avoids false positives from endsWith
+                    const index = dateList.taskList.findIndex(
+                        (t) => t.id.slice(TASK_ID_OFFSET) === taskId
+                    );
+                    if (index !== -1) {
+                        dateList.taskList[index] = normalizeTaskRecord({
+                            ...dateList.taskList[index],
+                            ...updates,
+                        });
+                    }
                 }
-            }
 
-            await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
+                await putToStore(store, dateList);
+            });
         } catch (error) {
             console.error("TodoService.batchUpdateTasks — failed:", error);
             throw error;
@@ -361,7 +396,7 @@ export const TodoService = {
      * Ensure a date list exists and add a task inside one transaction so MCP
      * writes cannot race date-list creation.
      * @param {string} dateId
-     * @param {{id: string, name: string, statusCode: number, desc: string, descFormat?: string}} task
+     * @param {{id: string, name: string, statusCode: number, desc: string}} task
      * @param {string} [dateName]
      * @returns {Promise<{dateListCreated: boolean, task: object}>}
      */
@@ -373,7 +408,7 @@ export const TodoService = {
                     id: dateId,
                     name: dateName,
                     taskList: [],
-                    statusCode: 1001,
+                    statusCode: STATUS_TODO,
                 };
 
                 dateList.taskList.push(normalizeTaskRecord(task));
@@ -437,39 +472,47 @@ export const TodoService = {
     },
 
     /**
-     * Normalize legacy task data in-place. This repairs escaped task names and
-     * fills missing descFormat metadata without needing a DB schema migration.
+     * Normalize legacy task data in-place. This repairs escaped task names
+     * without needing a DB schema migration.
+     * Runs all reads + writes inside a single IDB transaction for performance.
      * @returns {Promise<number>} number of updated date lists
      */
     async normalizeLegacyTaskData() {
         try {
-            const dateLists = await getAll(TASKS_DB_NAME, TASKS_STORE_NAME);
-            let updatedLists = 0;
-
-            for (const dateList of dateLists) {
-                let changed = false;
-                const normalizedTasks = (dateList.taskList ?? []).map((task) => {
-                    const normalizedTask = normalizeTaskRecord(task);
-                    if (
-                        normalizedTask.name !== task.name ||
-                        normalizedTask.desc !== task.desc ||
-                        normalizeDescFormat(task.descFormat) !== task.descFormat
-                    ) {
-                        changed = true;
-                    }
-                    return normalizedTask;
+            return await withTasksStore(async (store) => {
+                // Read all date lists within the same transaction
+                const dateLists = await new Promise((resolve, reject) => {
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
                 });
 
-                if (changed) {
-                    await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, {
-                        ...dateList,
-                        taskList: normalizedTasks,
-                    });
-                    updatedLists += 1;
-                }
-            }
+                let updatedLists = 0;
 
-            return updatedLists;
+                for (const dateList of dateLists) {
+                    let changed = false;
+                    const normalizedTasks = (dateList.taskList ?? []).map((task) => {
+                        const normalizedTask = normalizeTaskRecord(task);
+                        if (
+                            normalizedTask.name !== task.name ||
+                            normalizedTask.desc !== task.desc
+                        ) {
+                            changed = true;
+                        }
+                        return normalizedTask;
+                    });
+
+                    if (changed) {
+                        await putToStore(store, {
+                            ...dateList,
+                            taskList: normalizedTasks,
+                        });
+                        updatedLists += 1;
+                    }
+                }
+
+                return updatedLists;
+            });
         } catch (error) {
             console.error("TodoService.normalizeLegacyTaskData — failed:", error);
             throw error;
@@ -486,16 +529,18 @@ export const TodoService = {
         if (!taskIds?.length) return;
 
         try {
-            const dateList = await getByKey(TASKS_DB_NAME, TASKS_STORE_NAME, dateId);
-            if (!dateList) return;
+            await withTasksStore(async (store) => {
+                const dateList = await getFromStore(store, dateId);
+                if (!dateList) return;
 
-            const idsToRemove = new Set(taskIds);
-            dateList.taskList = dateList.taskList.filter((t) => {
-                const suffix = t.id.slice(TASK_ID_OFFSET);
-                return !idsToRemove.has(suffix);
+                const idsToRemove = new Set(taskIds);
+                dateList.taskList = dateList.taskList.filter((t) => {
+                    const suffix = t.id.slice(TASK_ID_OFFSET);
+                    return !idsToRemove.has(suffix);
+                });
+
+                await putToStore(store, dateList);
             });
-
-            await putRecord(TASKS_DB_NAME, TASKS_STORE_NAME, dateList);
         } catch (error) {
             console.error("TodoService.batchDeleteTasks — failed:", error);
             throw error;
@@ -513,7 +558,8 @@ export const TodoService = {
      */
     async getMarkdownDraft() {
         try {
-            const record = await getByKey(NOTES_DB_NAME, NOTES_STORE_NAME, this.MARKDOWN_DRAFT_ID);
+            // Use TodoService.MARKDOWN_DRAFT_ID (not this) to avoid binding fragility
+            const record = await getByKey(NOTES_DB_NAME, NOTES_STORE_NAME, TodoService.MARKDOWN_DRAFT_ID);
             return record ?? null;
         } catch (error) {
             console.error("TodoService.getMarkdownDraft — failed:", error);
@@ -529,7 +575,7 @@ export const TodoService = {
     async saveMarkdownDraft(content) {
         try {
             await putRecord(NOTES_DB_NAME, NOTES_STORE_NAME, {
-                id: this.MARKDOWN_DRAFT_ID,
+                id: TodoService.MARKDOWN_DRAFT_ID,
                 content,
                 updatedAt: Date.now(),
             });
@@ -545,7 +591,7 @@ export const TodoService = {
      */
     async deleteMarkdownDraft() {
         try {
-            await deleteByKey(NOTES_DB_NAME, NOTES_STORE_NAME, this.MARKDOWN_DRAFT_ID);
+            await deleteByKey(NOTES_DB_NAME, NOTES_STORE_NAME, TodoService.MARKDOWN_DRAFT_ID);
         } catch (error) {
             console.error("TodoService.deleteMarkdownDraft — failed:", error);
             throw error;
